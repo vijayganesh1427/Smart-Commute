@@ -9,7 +9,7 @@ export default function TopBar() {
                 top-0
                 left-0
                 right-0
-                z-50
+                z-10
 
                 flex
                 items-center
@@ -17,7 +17,7 @@ export default function TopBar() {
                 px-6
                 py-4
 
-                bg-white/80
+                bg-[rgb(22,0,31)]
                 backdrop-blur-md
                 border-b
                 border-gray-200
@@ -27,15 +27,15 @@ export default function TopBar() {
             <div className="flex items-center gap-3">
                 <BusFront
                     size={30}
-                    className="text-red-700"
+                    className="text-red-500"
                 />
 
                 <div>
-                    <h1 className="text-xl font-bold text-gray-900">
+                    <h1 className="text-xl font-bold text-cyan-400">
                         {APP_NAME}
                     </h1>
 
-                    <p className="text-xs text-gray-500">
+                    <p className="text-xs text-gray-100">
                         {APP_TAGLINE}
                     </p>
                 </div>
