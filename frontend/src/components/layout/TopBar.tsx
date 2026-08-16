@@ -20,7 +20,7 @@ export default function TopBar() {
                 bg-[rgb(22,0,31)]
                 backdrop-blur-md
                 border-b
-                border-gray-200
+                border-cyan-200
                 shadow-sm
             "
         >

@@ -1,8 +1,8 @@
 import { Search } from "lucide-react";
-
+import { UI_STYLES } from "../../styles/designSystem";
 export default function SearchBar() {
     return (
-        <div className="
+        <div className={`
             absolute
             flex 
             items-center 
@@ -11,12 +11,12 @@ export default function SearchBar() {
             top-5 
             bg-gray-900 
             rounded-full 
-            shadow-[0_0_10px_2px_rgba(0,255,255,0.6)]  
+            ${UI_STYLES.glow.cyan}  
             px-4 
             py-2 
             w-96 
             duration-300
-            hover:scale-103 ">
+            hover:scale-103 `}>
             <Search size={20} className="text-gray-100 mr-2" />
 
             <input

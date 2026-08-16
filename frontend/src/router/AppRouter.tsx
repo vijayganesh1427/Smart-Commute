@@ -1,7 +1,5 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-
 import MainLayout from "../layouts/MainLayout";
-
 import FleetMap from "../pages/FleetMap/FleetMap";
 import BusDetails from "../pages/BusDetails/BusDetails";
 import About from "../pages/About/About";
