@@ -1,6 +1,6 @@
 export const UI_STYLES = {
     glass:
-        "bg-gray-900/50 backdrop-blur-md border border-gray-700 shadow-lg",
+        "bg-gray-900/40 backdrop-blur-md border border-gray-700 shadow-lg",
 
     glow:
         {cyan:

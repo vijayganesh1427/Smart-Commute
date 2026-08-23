@@ -1,8 +1,8 @@
-import MapContainer from "../../components/map/MapContainer";
+import MapView from "../../components/map/MapView";
 export default function FleetMap() {
   return (
         <div>
-            <MapContainer />
+            <MapView />
         </div>
     );
 }

@@ -2,7 +2,7 @@ import type { Bus } from "../types/bus";
 
 export const buses: Bus[] = [
     {
-        id: "1",
+        id: 1,
         registrationNumber: "TN02CB6967",
         routeName: "Kelambakkam",
         currentArea: "Navalur",
@@ -16,4 +16,9 @@ export const buses: Bus[] = [
         estimatedArrival: "12 mins",
         distanceFromUser: 2.1,
     },
+    {
+        id: 2,
+        latitude: 12.945,
+        longitude: 80.226,  
+    }
 ];
