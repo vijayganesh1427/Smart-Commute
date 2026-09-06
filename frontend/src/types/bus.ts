@@ -1,4 +1,4 @@
-export type BusStatus = "live" | "updating" | "offline";
+export type BusStatus = "Live" | "Stale" | "Offline";
 export interface Bus {
   id: number;
   registrationNumber?: string;
@@ -6,11 +6,13 @@ export interface Bus {
   currentArea?: string;
   latitude: number;
   longitude: number;
-  status?: BusStatus;
+  status: BusStatus;
   speed?: number;
   direction?: string;
   lastUpdated?: string;
   isAC?: boolean;
-  estimatedArrival?: string;
+  estimatedArrival?: number;
+  distanceFromVIT?: number;
   distanceFromUser?: number;
+  route?: string[];
 }

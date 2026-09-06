@@ -1,19 +1,18 @@
-import { MapContainer, TileLayer, Marker, Polyline } from "react-leaflet";
+import { MapContainer, Polyline } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
-import { useState,useEffect } from "react";
+import "maplibre-gl/dist/maplibre-gl.css";
+import { setWorkerUrl } from "maplibre-gl";
+import maplibreWorker from "maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url";
+import { useState, useEffect } from "react";
 import BusMarker from "./BusMarker";
-import type { Bus } from "../../types/bus";
 import { buses } from "../../data/buses";
 import { routes } from "../../data/routes";
-interface UserLocation{
-    lat: number;
-    long: number;
-}
-interface MapViewProps {
-    selBus: Bus | null;
-    onBusSel: (b: Bus) => void;
-}
-export default function MapView({selBus,onBusSel}:MapViewProps) {
+import type { UserLocation, MapViewProps } from "../../types/mapsProps";
+import UserMarker from "./UserMarker";
+import DestinationMarker from "./DestinationMarker";
+import DarkMapLayer from "./DarkMapLayer";
+setWorkerUrl(maplibreWorker);
+export default function MapView({selBus,filBus,onBusSel}:MapViewProps) {
     const [userLoc,setUserLoc]=useState<UserLocation|null>(null);
     useEffect(()=>{
                 const onSuccess=(position: GeolocationPosition)=>
@@ -24,18 +23,26 @@ export default function MapView({selBus,onBusSel}:MapViewProps) {
             },
             []
     )
+    let busesToDisplay = buses;
+    if (filBus?.length > 0) {
+        busesToDisplay = filBus;
+
+        if (selBus && !filBus.some(bus => bus.id === selBus.id)) {
+            busesToDisplay = [...filBus, selBus];
+        }
+    }
     return (
         <MapContainer
-            center={[13.0827, 80.2707]}
-            zoom={13}
+            center={[12.9827, 80.2007]}
+            zoom={12}
+            minZoom={1}
+            maxBounds={[[180, -Infinity], [-180, Infinity]]}
+            maxBoundsViscosity={1}
             className="h-full w-full"
         >
-            <TileLayer
-                attribution='&copy; OpenStreetMap contributors'
-                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-            />
-            {userLoc && <Marker position={[userLoc.lat,userLoc.long]}/>}
-            {buses.map(bus=>(
+            <DarkMapLayer />
+            {userLoc && <UserMarker position={[userLoc.lat,userLoc.long]}/>}
+            {busesToDisplay.map(bus => (
                 <BusMarker
                     key={bus.id}
                     bus={bus}
@@ -53,7 +60,7 @@ export default function MapView({selBus,onBusSel}:MapViewProps) {
                     }}
                 />
             )}
-            {selBus && <Marker position={[12.8406,80.1534]}/>}
+            {selBus && <DestinationMarker position={[12.8405,80.153]}/>}
         </MapContainer>
     );
 }
