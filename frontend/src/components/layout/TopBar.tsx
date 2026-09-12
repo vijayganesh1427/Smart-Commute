@@ -1,7 +1,8 @@
 import { BusFront } from "lucide-react";
 import { APP_NAME, APP_TAGLINE } from "../../constants/app";
-
+import { useNavigate } from "react-router-dom";
 export default function TopBar() {
+    const navigate = useNavigate();
     return (
         <header
             className="
@@ -26,7 +27,7 @@ export default function TopBar() {
                 sm:shadow-sm
             "
         >
-            <div className="flex items-center gap-2 sm:gap-3">
+            <div className="flex items-center text-white gap-2 sm:gap-3">
                 <BusFront
                     size={28}
                     className="text-red-500 sm:w-[30px] sm:h-[30px]"
@@ -41,6 +42,7 @@ export default function TopBar() {
                         {APP_TAGLINE}
                     </p>
                 </div>
+                <button type="button" className="border border-cyan-500 rounded-lg p-2 text-[#cbd5e1] bg-cyan-950" onClick={()=>navigate("/my-fleet")}>My Fleet</button>
             </div>
         </header>
     );

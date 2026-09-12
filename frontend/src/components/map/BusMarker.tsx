@@ -29,6 +29,7 @@ export default function BusMarker({
                     justify-content:center;
                     border-radius:8px;
                     background: ${busColor};
+                    opacity: ${statusColor=="#ef4444" && "60%"};
                     border: ${isSelected?"3px solid cyan":"2px solid #cbd5e1"};
                     box-shadow:0 2px 7px rgba(0,0,0,0.55);
                     color: #cbd5e1;

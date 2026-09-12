@@ -1,6 +1,6 @@
-import type { LatLngExpression } from "leaflet";
+import type { LatLngTuple } from "leaflet";
 
-export const routes: Record<number, LatLngExpression[]> = {
+export const routes: Record<number, LatLngTuple[]> = {
     1: [
         [12.845, 80.226],
         [12.848, 80.216],

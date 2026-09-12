@@ -1,5 +1,3 @@
-import { useState } from "react";
-import type { Bus } from "../../types/bus";
 import { STATUS_CONFIG } from "../../constants/statusConfig";
 import {
     BusFront,
@@ -12,15 +10,16 @@ import {
     Slash,
     Star,
 } from "lucide-react";
+import type { DisplayBusProps } from "../../types/bottomSheetProps";
 
 export default function DisplayBusDetails({
     bus,
     child1,
-}: {
-    bus: Bus;
-    child1: boolean;
-}) {
-    const [isFavourite, setIsFavourite] = useState(false);
+    isFavourite,
+    onToggleFavourite
+}:
+    DisplayBusProps
+) {
     const config=STATUS_CONFIG[bus.status];
     // Floating bus header
     if (child1) {
@@ -87,7 +86,7 @@ export default function DisplayBusDetails({
                     <button
                         type="button"
                         onClick={() =>
-                            setIsFavourite((prev) => !prev)
+                            onToggleFavourite(bus.id)
                         }
                         className="
                             flex
