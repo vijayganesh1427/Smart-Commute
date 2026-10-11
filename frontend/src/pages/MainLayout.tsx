@@ -10,6 +10,7 @@ import DisplayBusDetails from "../components/bus/DisplayBusDetails";
 import type { Bus } from "../types/bus";
 import { buses } from "../data/buses";
 import DisplayMessage from "../components/common/DisplayMessage";
+import type { BusRouteResponse } from "../services/routeService";
 import { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 interface MainLayoutProps {
@@ -26,6 +27,8 @@ export default function MainLayout({
   const [filteredBus, setfilteredBus] = useState<Bus[]>([]);
   const [filSuccess, setfilSuccess] = useState(true);
   const [messageKey, setMessageKey] = useState(0);
+  const [routeData, setRouteData] =
+    useState<BusRouteResponse | null>(null);
   const selectedBus = (selB: Bus | null) => {
     if (selB) {
         setSearchParams({ bus: String(selB.id) });
@@ -93,6 +96,7 @@ export default function MainLayout({
         <MapView
           selBus={selBus}
           filBus={filteredBus}
+          onRouteDataChange={setRouteData}
           onBusSel={selectedBus}
         />
       </div>
@@ -123,7 +127,10 @@ export default function MainLayout({
               <DisplayBusDetails
                 bus={selBus}
                 child1={false}
+                etaMinutes={routeData?.etaMinutes}
+                remainingDistanceKm={routeData?.remainingDistanceKm}
                 isFavourite={favoriteBuses.includes(selBus.id)}
+                
                 onToggleFavourite={toggleFavorite}
               />
 

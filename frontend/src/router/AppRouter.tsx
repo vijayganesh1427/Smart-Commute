@@ -1,7 +1,6 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { useState } from "react";
-import MainLayout from "../layouts/MainLayout";
-import FleetMap from "../pages/FleetMap/FleetMap";
+import MainLayout from "../pages/MainLayout";
 import BusDetails from "../pages/BusDetails/BusDetails";
 import About from "../pages/About/About";
 import NotFound from "../pages/NotFound/NotFound";
@@ -51,15 +50,14 @@ export default function AppRouter() {
 
         {/* Map application */}
         <Route
+          path="/"
           element={
             <MainLayout
               favoriteBuses={favoriteBuses}
               toggleFavorite={toggleFavorite}
             />
           }
-        >
-          <Route path="/" element={<FleetMap />} />
-        </Route>
+        />
 
         {/* Standalone pages */}
         <Route

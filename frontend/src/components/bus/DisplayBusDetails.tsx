@@ -6,8 +6,8 @@ import {
     Gauge,
     Navigation,
     Clock,
-    Snowflake,
-    Slash,
+    Wind,
+    SunMedium,
     Star,
 } from "lucide-react";
 import type { DisplayBusProps } from "../../types/bottomSheetProps";
@@ -16,10 +16,10 @@ export default function DisplayBusDetails({
     bus,
     child1,
     isFavourite,
-    onToggleFavourite
-}:
-    DisplayBusProps
-) {
+    onToggleFavourite,
+    etaMinutes,
+    remainingDistanceKm,
+}: DisplayBusProps) {
     const config=STATUS_CONFIG[bus.status];
     // Floating bus header
     if (child1) {
@@ -55,29 +55,29 @@ export default function DisplayBusDetails({
 
                     {/* AC / Non-AC */}
                     <div
-                        className="
+                        className={`
                             relative
                             flex
                             items-center
-                            gap-1
+                            gap-2
                             rounded-lg
                             border
-                            border-cyan-500/70
+                            ${bus.isAC?"border-cyan-500/70":"border-orange-500/70"}
                             bg-zinc-900
                             px-2
                             py-1
-                        "
+                        `}
                     >
-                        <Snowflake className="h-4 w-4 text-sky-400" />
+                        
 
-                        {!bus.isAC && (
-                            <Slash
-                                className="absolute left-2 text-red-600"
+                        {bus.isAC?<Wind className="h-4 w-4 text-sky-400" />:(
+                            <SunMedium
+                                className="h-4 w-4 text-orange-400"
                                 size={16}
                             />
                         )}
 
-                        <span className="text-xs text-white">
+                        <span className={`text-xs ${bus.isAC?"text-cyan-300":"text-orange-300"}`}>
                             {bus.isAC ? "AC" : "Non-AC"}
                         </span>
                     </div>
@@ -227,7 +227,9 @@ export default function DisplayBusDetails({
                     </div>
 
                     <div className="mt-1 font-bold text-white">
-                        {bus.distanceFromVIT} km
+                        {remainingDistanceKm != null
+                            ? `${remainingDistanceKm} km`
+                            : "—"}
                     </div>
                 </div>
 
@@ -250,7 +252,11 @@ export default function DisplayBusDetails({
                     </div>
 
                     <div className="mt-1 font-bold text-cyan-400">
-                        {bus.estimatedArrival} mins
+                        {bus.status !== "Live"
+                            ? "Unavailable"
+                            : etaMinutes != null
+                                ? `${etaMinutes} mins`
+                                : "Calculating…"}
                     </div>
                 </div>
 

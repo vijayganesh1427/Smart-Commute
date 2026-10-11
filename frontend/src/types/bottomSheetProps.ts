@@ -7,5 +7,7 @@ export interface DisplayBusProps{
     bus: Bus;
     child1: boolean;
     isFavourite: boolean;
+    etaMinutes?: number | null;
+    remainingDistanceKm?: number | null;
     onToggleFavourite: (busId: number) => void;
 };
