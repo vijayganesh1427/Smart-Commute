@@ -11,6 +11,7 @@ import {
     Star,
 } from "lucide-react";
 import type { DisplayBusProps } from "../../types/bottomSheetProps";
+import CrowdReportPanel from "./CrowdReportPanel";
 
 export default function DisplayBusDetails({
     bus,
@@ -311,6 +312,8 @@ export default function DisplayBusDetails({
                     </div>
                 </div>
             </div>
+
+            <CrowdReportPanel busId={bus.id} />
 
         </div>
     );

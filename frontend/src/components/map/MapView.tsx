@@ -5,7 +5,7 @@ import { setWorkerUrl } from "maplibre-gl";
 import maplibreWorker from "maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url";
 import { useState, useEffect } from "react";
 import BusMarker from "./BusMarker";
-import { buses } from "../../data/buses";
+//import { buses } from "../../data/buses";
 import type { UserLocation, MapViewProps } from "../../types/mapsProps";
 import UserMarker from "./UserMarker";
 import DestinationMarker from "./DestinationMarker";
@@ -16,7 +16,7 @@ import { getBusRoute } from "../../services/routeService";
 import type { BusRouteResponse } from "../../services/routeService";
 //import SourceMarker from "./SourceMarker";
 setWorkerUrl(maplibreWorker);
-export default function MapView({selBus,filBus,onRouteDataChange,onBusSel}:MapViewProps) {
+export default function MapView({buses,selBus,filBus,onRouteDataChange,onBusSel}:MapViewProps) {
     const [userLoc,setUserLoc]=useState<UserLocation|null>(null);
     const [route, setRoute] = useState<LatLngExpression[]>([]);
     const [routeData, setRouteData] = useState<BusRouteResponse | null>(null);

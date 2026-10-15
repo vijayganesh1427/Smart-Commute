@@ -10,11 +10,15 @@ export interface BusRouteResponse {
     busStatus: "Live" | "Stale" | "Offline";
 }
 
+const API_BASE_URL = (
+    import.meta.env.VITE_API_BASE_URL || "http://localhost:5000"
+).replace(/\/$/, "");
+
 export async function getBusRoute(
     busId: number
 ): Promise<BusRouteResponse> {
     const response = await fetch(
-        `http://localhost:5000/api/buses/${busId}/route`
+        `${API_BASE_URL}/api/buses/${busId}/route`
     );
 
     if (!response.ok) {

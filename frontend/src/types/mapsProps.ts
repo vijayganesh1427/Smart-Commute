@@ -5,6 +5,7 @@ export interface UserLocation{
     long: number;
 }
 export interface MapViewProps {
+    buses: Bus[];
     selBus: Bus | null;
     filBus: Bus[];
     onRouteDataChange: (data: BusRouteResponse | null) => void;
