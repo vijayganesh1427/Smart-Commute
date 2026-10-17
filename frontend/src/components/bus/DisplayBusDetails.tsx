@@ -9,7 +9,9 @@ import {
     Wind,
     SunMedium,
     Star,
+    Share2,
 } from "lucide-react";
+import { useState } from "react";
 import type { DisplayBusProps } from "../../types/bottomSheetProps";
 import CrowdReportPanel from "./CrowdReportPanel";
 
@@ -21,7 +23,47 @@ export default function DisplayBusDetails({
     etaMinutes,
     remainingDistanceKm,
 }: DisplayBusProps) {
-    const config=STATUS_CONFIG[bus.status];
+    const config = STATUS_CONFIG[bus.status];
+    const [shareMessage, setShareMessage] = useState("");
+
+    const shareBus = async () => {
+        const shareUrl = new URL(window.location.href);
+        shareUrl.searchParams.set("bus", String(bus.id));
+        const url = shareUrl.toString();
+        const shareData = {
+            title: `Smart Commute - Bus ${bus.id}`,
+            text: `Track Bus ${bus.id} (${bus.routeName}) on Smart Commute.`,
+            url,
+        };
+
+        setShareMessage("");
+
+        try {
+            if (typeof navigator.share === "function") {
+                await navigator.share(shareData);
+                setShareMessage("Share link ready!");
+                return;
+            }
+
+            if (navigator.clipboard?.writeText) {
+                await navigator.clipboard.writeText(url);
+                setShareMessage("Link copied!");
+                return;
+            }
+
+            window.prompt("Copy this bus-sharing link:", url);
+        } catch (error) {
+            // Closing the native share sheet is normal and should not show an error.
+            if (error instanceof Error && error.name === "AbortError") return;
+
+            try {
+                await navigator.clipboard.writeText(url);
+                setShareMessage("Link copied!");
+            } catch {
+                window.prompt("Copy this bus-sharing link:", url);
+            }
+        }
+    };
     // Floating bus header
     if (child1) {
         return (
@@ -283,6 +325,23 @@ export default function DisplayBusDetails({
                         {bus.direction}
                     </div>
                 </div>
+            </div>
+
+            {/* Share Bus */}
+            <div className="mt-5">
+                <button
+                    type="button"
+                    onClick={shareBus}
+                    className="flex w-full items-center justify-center gap-2 rounded-xl border border-cyan-500/50 bg-cyan-950/40 px-4 py-3 font-semibold text-cyan-300 transition hover:bg-cyan-900/60"
+                >
+                    <Share2 className="h-4 w-4" />
+                    Share Bus
+                </button>
+                {shareMessage && (
+                    <p role="status" className="mt-2 text-center text-sm text-emerald-300">
+                        {shareMessage}
+                    </p>
+                )}
             </div>
 
             {/* Current Area */}

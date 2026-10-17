@@ -5,76 +5,71 @@ import BusDetails from "../pages/BusDetails/BusDetails";
 import About from "../pages/About/About";
 import NotFound from "../pages/NotFound/NotFound";
 import MyFleet from "../pages/MyFleet/MyFleet";
+import Analytics from "../pages/Analytics/Analytics";
+import FreshersMode from "../pages/FreshersMode/FreshersMode";
+import AdminFleet from "../pages/AdminFleet/AdminFleet";
 
 export default function AppRouter() {
-
-  // Saved favourite bus IDs
-  const [favoriteBuses, setFavoriteBuses] = useState<number[]>(() => {
-    const saved = localStorage.getItem("favoriteBuses");
-
-    return saved ? JSON.parse(saved) : [];
-  });
-
-  const toggleFavorite = (busId: number) => {
-
-    // Confirm before removing
-    if (favoriteBuses.includes(busId)) {
-
-      const confirmed = confirm(
-        "Are you sure you want to remove this bus from your favourites?"
-      );
-
-      if (!confirmed) {
-        return;
-      }
-    }
-
-    setFavoriteBuses(prev => {
-
-      const updated = prev.includes(busId)
-        ? prev.filter(id => id !== busId)
-        : [...prev, busId];
-
-      localStorage.setItem(
-        "favoriteBuses",
-        JSON.stringify(updated)
-      );
-
-      return updated;
+    // Saved favourite bus IDs
+    const [favoriteBuses, setFavoriteBuses] = useState<number[]>(() => {
+        const saved = localStorage.getItem("favoriteBuses");
+        return saved ? JSON.parse(saved) : [];
     });
-  };
 
-  return (
-    <BrowserRouter>
-      <Routes>
+    const toggleFavorite = (busId: number) => {
+        // Confirm before removing
+        if (favoriteBuses.includes(busId)) {
+            const confirmed = confirm(
+                "Are you sure you want to remove this bus from your favourites?",
+            );
 
-        {/* Map application */}
-        <Route
-          path="/"
-          element={
-            <MainLayout
-              favoriteBuses={favoriteBuses}
-              toggleFavorite={toggleFavorite}
-            />
-          }
-        />
+            if (!confirmed) return;
+        }
 
-        {/* Standalone pages */}
-        <Route
-          path="/my-fleet"
-          element={
-            <MyFleet
-              favoriteBuses={favoriteBuses}
-              toggleFavorite={toggleFavorite}
-            />
-          }
-        />
-        <Route path="/bus/:id" element={<BusDetails />} />
-        <Route path="/about" element={<About />} />
+        setFavoriteBuses((prev) => {
+            const updated = prev.includes(busId)
+                ? prev.filter((id) => id !== busId)
+                : [...prev, busId];
 
-        <Route path="*" element={<NotFound />} />
+            localStorage.setItem("favoriteBuses", JSON.stringify(updated));
+            return updated;
+        });
+    };
 
-      </Routes>
-    </BrowserRouter>
-  );
+    return (
+        <BrowserRouter>
+            <Routes>
+                {/* Map application */}
+                <Route
+                    path="/"
+                    element={
+                        <MainLayout
+                            favoriteBuses={favoriteBuses}
+                            toggleFavorite={toggleFavorite}
+                        />
+                    }
+                />
+
+                {/* Standalone pages */}
+                <Route
+                    path="/my-fleet"
+                    element={
+                        <MyFleet
+                            favoriteBuses={favoriteBuses}
+                            toggleFavorite={toggleFavorite}
+                        />
+                    }
+                />
+                <Route
+                    path="/analytics"
+                    element={<Analytics favoriteBuses={favoriteBuses} />}
+                />
+                <Route path="/freshers" element={<FreshersMode />} />
+                <Route path="/admin/fleet" element={<AdminFleet />} />
+                <Route path="/bus/:id" element={<BusDetails />} />
+                <Route path="/about" element={<About />} />
+                <Route path="*" element={<NotFound />} />
+            </Routes>
+        </BrowserRouter>
+    );
 }

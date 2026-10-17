@@ -82,7 +82,7 @@ export default function MapView({buses,selBus,filBus,onRouteDataChange,onBusSel}
         <MapContainer
             center={[12.9727, 80.1757]}
             zoom={11}
-            minZoom={8}
+            minZoom={9}
             maxBounds={[[180, -Infinity], [-180, Infinity]]}
             maxZoom={20}
             maxBoundsViscosity={1}
