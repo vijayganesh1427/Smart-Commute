@@ -1,294 +1,260 @@
-import { useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-    ArrowLeft,
-    BusFront,
-    Check,
-    CircleAlert,
-    Search,
-    ShieldAlert,
-    SlidersHorizontal,
-    Activity,
-    MapPin,
-    Route as RouteIcon,
-} from "lucide-react";
-import { buses as seedBuses } from "../../data/buses";
-import type { Bus } from "../../types/bus";
+    getAdminRequests,
+    reviewAdminRequest,
+} from "../../services/adminRequestService";
+import type { AdminRequest, AdminRequestStatus } from "../../types/adminRequest";
+import { getAdminFleet, updateAdminBus, type BusConfigRecord } from "../../services/adminFleetService";
 
-const STORAGE_KEY = "smartCommuteFleet";
+const KEY_STORAGE = "smart-commute-admin-key";
 
-function loadFleet(): Bus[] {
-    try {
-        const stored = localStorage.getItem(STORAGE_KEY);
-        if (!stored) return seedBuses.map((bus) => ({ ...bus }));
-
-        const parsed: unknown = JSON.parse(stored);
-        if (!Array.isArray(parsed)) return seedBuses.map((bus) => ({ ...bus }));
-
-        const savedById = new Map<number, Bus>(
-            parsed
-                .filter((item): item is Bus =>
-                    typeof item === "object" &&
-                    item !== null &&
-                    typeof (item as Bus).id === "number" &&
-                    ["Live", "Stale", "Offline"].includes((item as Bus).status)
-                )
-                .map((bus) => [bus.id, bus])
-        );
-
-        return seedBuses.map((bus) => ({
-            ...bus,
-            ...(savedById.get(bus.id) ?? {}),
-        }));
-    } catch {
-        return seedBuses.map((bus) => ({ ...bus }));
-    }
-}
-
-function persistFleet(fleet: Bus[]) {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(fleet));
-}
-
-type StatusFilter = "All" | Bus["status"];
-
-const statusStyles: Record<Bus["status"], string> = {
-    Live: "bg-emerald-950 text-emerald-300 border-emerald-900",
-    Stale: "bg-amber-950 text-amber-300 border-amber-900",
-    Offline: "bg-slate-800 text-slate-300 border-slate-700",
+const statusClass: Record<AdminRequestStatus, string> = {
+    pending: "border-amber-500/40 bg-amber-500/10 text-amber-200",
+    approved: "border-emerald-500/40 bg-emerald-500/10 text-emerald-200",
+    rejected: "border-rose-500/40 bg-rose-500/10 text-rose-200",
+    archived: "border-zinc-600 bg-zinc-800 text-zinc-300",
 };
 
 export default function AdminFleet() {
-    const navigate = useNavigate();
-    const [fleet, setFleet] = useState<Bus[]>(loadFleet);
-    const [query, setQuery] = useState("");
-    const [statusFilter, setStatusFilter] = useState<StatusFilter>("All");
-    const [savedMessage, setSavedMessage] = useState("");
-    const [editingBusId, setEditingBusId] = useState<number | null>(null);
+    const [adminKey, setAdminKey] = useState(() => sessionStorage.getItem(KEY_STORAGE) ?? "");
+    const [keyDraft, setKeyDraft] = useState(() => sessionStorage.getItem(KEY_STORAGE) ?? "");
+    const [requests, setRequests] = useState<AdminRequest[]>([]);
+    const [filter, setFilter] = useState<"pending" | "all">("pending");
+    const [loading, setLoading] = useState(false);
+    const [busyId, setBusyId] = useState<string | null>(null);
+    const [error, setError] = useState("");
+    const [notice, setNotice] = useState("");
+    const [section, setSection] = useState<"requests" | "buses">("requests");
+    const [buses, setBuses] = useState<BusConfigRecord[]>([]);
+    const [selectedBusId, setSelectedBusId] = useState("");
+    const [busForm, setBusForm] = useState<BusConfigRecord | null>(null);
+    const [busBusy, setBusBusy] = useState(false);
 
-    const counts = useMemo(() => ({
-        total: fleet.length,
-        live: fleet.filter((bus) => bus.status === "Live").length,
-        stale: fleet.filter((bus) => bus.status === "Stale").length,
-        offline: fleet.filter((bus) => bus.status === "Offline").length,
-    }), [fleet]);
+    const loadBuses = useCallback(async (key: string) => {
+        setBusBusy(true);
+        setError("");
+        try {
+            const data = await getAdminFleet(key);
+            setBuses(data);
+            if (data.length) {
+                const chosen = data.find((bus) => String(bus.busId) === selectedBusId) ?? data[0];
+                setSelectedBusId(String(chosen.busId));
+                setBusForm(chosen);
+            }
+        } catch (err) {
+            setError(err instanceof Error ? err.message : "Could not load bus configuration.");
+        } finally { setBusBusy(false); }
+    }, [selectedBusId]);
 
-    const filteredFleet = useMemo(() => {
-        const normalized = query.trim().toLowerCase();
-        return fleet.filter((bus) => {
-            const matchesQuery = !normalized || [
-                String(bus.id),
-                bus.registrationNumber,
-                bus.routeName,
-                bus.currentArea,
-                ...(bus.route ?? []),
-            ].join(" ").toLowerCase().includes(normalized);
-            return matchesQuery && (statusFilter === "All" || bus.status === statusFilter);
-        });
-    }, [fleet, query, statusFilter]);
+    async function saveBus(event: React.FormEvent<HTMLFormElement>) {
+        event.preventDefault();
+        if (!busForm) return;
+        setBusBusy(true); setError(""); setNotice("");
+        try {
+            const saved = await updateAdminBus(adminKey, busForm.busId, {
+                provider: busForm.provider,
+                registrationNumber: busForm.registrationNumber,
+                routeName: busForm.routeName,
+                currentArea: busForm.currentArea,
+                direction: busForm.direction,
+                isAC: busForm.isAC,
+                route: busForm.route,
+                trackingUrl: busForm.trackingUrl,
+            });
+            setBuses((previous) => previous.map((bus) => bus.busId === saved.busId ? saved : bus));
+            setBusForm(saved);
+            setNotice(`Bus ${saved.busId} configuration saved.`);
+        } catch (err) {
+            setError(err instanceof Error ? err.message : "Could not save bus configuration.");
+        } finally { setBusBusy(false); }
+    }
+    const load = useCallback(async (key: string) => {
+        setLoading(true);
+        setError("");
+        try {
+            const data = await getAdminRequests(key);
+            setRequests(data);
+            setAdminKey(key);
+            sessionStorage.setItem(KEY_STORAGE, key);
+        } catch (err) {
+            setError(err instanceof Error ? err.message : "Failed to load admin requests.");
+        } finally {
+            setLoading(false);
+        }
+    }, []);
 
-    const changeStatus = (busId: number, status: Bus["status"]) => {
-        const updated = fleet.map((bus) =>
-            bus.id === busId ? { ...bus, status } : bus
+    useEffect(() => {
+        const saved = sessionStorage.getItem(KEY_STORAGE);
+        if (saved) void load(saved);
+    }, [load]);
+
+    const visibleRequests = useMemo(() => {
+        const sorted = [...requests].sort(
+            (a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime(),
         );
-        setFleet(updated);
-        persistFleet(updated);
-        setSavedMessage(`Bus #${busId} updated to ${status}.`);
-        setEditingBusId(null);
-    };
+        return filter === "pending" ? sorted.filter((item) => item.status === "pending") : sorted;
+    }, [requests, filter]);
 
-    const resetDemoFleet = () => {
-        const confirmed = window.confirm(
-            "Reset all fleet statuses to the original demo data? This cannot be undone."
+    async function decide(
+        request: AdminRequest,
+        decision: "approved" | "rejected" | "archived",
+    ) {
+        const note = window.prompt(
+            decision === "approved" ? "Optional approval note:" : "Add a note for the audit trail (optional):",
+            "",
         );
-        if (!confirmed) return;
-        const reset = seedBuses.map((bus) => ({ ...bus }));
-        setFleet(reset);
-        persistFleet(reset);
-        setSavedMessage("Fleet statuses reset to the original demo data.");
-        setEditingBusId(null);
-    };
+        if (note === null) return;
+        setBusyId(request.id);
+        setError("");
+        setNotice("");
+        try {
+            const updated = await reviewAdminRequest(request.id, adminKey, decision, note);
+            setRequests((previous) => previous.map((item) => item.id === updated.id ? updated : item));
+            setNotice(`Request ${decision}.`);
+        } catch (err) {
+            setError(err instanceof Error ? err.message : "Could not update the request.");
+        } finally {
+            setBusyId(null);
+        }
+    }
+
+    function signOut() {
+        sessionStorage.removeItem(KEY_STORAGE);
+        setAdminKey("");
+        setKeyDraft("");
+        setRequests([]);
+        setNotice("");
+        setError("");
+    }
 
     return (
-        <main className="min-h-screen bg-[#100018] text-slate-100">
-            <header className="sticky top-0 z-20 border-b border-cyan-900/70 bg-[#16001f]/95 backdrop-blur">
-                <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
-                    <button
-                        type="button"
-                        onClick={() => navigate("/")}
-                        className="inline-flex items-center gap-2 rounded-lg border border-cyan-800 px-3 py-2 text-sm text-cyan-100 transition hover:bg-cyan-950"
-                    >
-                        <ArrowLeft size={16} />
-                        <span className="hidden sm:inline">Back to map</span>
-                        <span className="sm:hidden">Map</span>
-                    </button>
-                    <div className="flex items-center gap-2 text-cyan-300">
-                        <SlidersHorizontal size={21} />
-                        <span className="font-semibold">Fleet Management</span>
-                    </div>
-                    <button
-                        type="button"
-                        onClick={() => navigate("/analytics")}
-                        className="rounded-lg border border-cyan-800 px-3 py-2 text-sm text-cyan-100 transition hover:bg-cyan-950"
-                    >
-                        Analytics
-                    </button>
-                </div>
-            </header>
-
-            <div className="mx-auto max-w-7xl px-4 py-7 sm:px-6 sm:py-9">
-                <section className="mb-7 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
+        <main className="min-h-screen bg-zinc-950 px-4 py-8 text-zinc-100 sm:px-8">
+            <div className="mx-auto max-w-6xl">
+                <div className="mb-8 flex flex-wrap items-start justify-between gap-4">
                     <div>
-                        <p className="text-xs font-bold uppercase tracking-[0.2em] text-cyan-400">Operations overview</p>
-                        <h1 className="mt-2 text-3xl font-bold text-white sm:text-4xl">Fleet dashboard</h1>
-                        <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-400">
-                            Review demo fleet status, inspect route information, and update a bus's displayed status.
+                        <p className="text-xs font-bold uppercase tracking-[0.22em] text-cyan-300">VITC Smart Commute</p>
+                        <h1 className="mt-2 text-3xl font-bold tracking-tight">Admin Fleet Management</h1>
+                        <p className="mt-2 max-w-2xl text-sm text-zinc-400">
+                            Review student-submitted bus changes. Decisions here update the request queue;
+                            live fleet provisioning still requires a valid GPS-provider configuration.
                         </p>
                     </div>
-                    <button
-                        type="button"
-                        onClick={resetDemoFleet}
-                        className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-700 px-4 py-2.5 text-sm font-semibold text-slate-300 transition hover:bg-slate-900"
-                    >
-                        Reset demo data
-                    </button>
-                </section>
-
-                <div className="mb-6 flex gap-3 rounded-2xl border border-amber-800/70 bg-amber-950/30 p-4">
-                    <ShieldAlert size={22} className="mt-0.5 shrink-0 text-amber-300" />
-                    <div>
-                        <p className="font-semibold text-amber-200">Demo admin interface — not access-controlled</p>
-                        <p className="mt-1 text-sm leading-5 text-amber-100/70">
-                            Changes are saved in this browser's localStorage only. There is no admin authentication, shared server persistence, or authorization check. Do not use this page to manage a real fleet.
-                        </p>
-                    </div>
-                </div>
-
-                <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-                    {[
-                        { label: "Total buses", value: counts.total, icon: BusFront, accent: "text-cyan-300" },
-                        { label: "Live", value: counts.live, icon: Activity, accent: "text-emerald-300" },
-                        { label: "Stale", value: counts.stale, icon: CircleAlert, accent: "text-amber-300" },
-                        { label: "Offline", value: counts.offline, icon: CircleAlert, accent: "text-slate-300" },
-                    ].map((item) => {
-                        const Icon = item.icon;
-                        return (
-                            <article key={item.label} className="rounded-2xl border border-slate-800 bg-slate-900/60 p-4 sm:p-5">
-                                <div className="flex items-center justify-between gap-2">
-                                    <p className="text-sm text-slate-400">{item.label}</p>
-                                    <Icon size={19} className={item.accent} />
-                                </div>
-                                <p className="mt-3 text-3xl font-bold text-white">{item.value}</p>
-                            </article>
-                        );
-                    })}
-                </section>
-
-                <section className="mt-8">
-                    <div className="mb-4 flex flex-col gap-3 sm:flex-row">
-                        <label className="flex flex-1 items-center gap-3 rounded-xl border border-slate-700 bg-slate-900 px-4 py-3 focus-within:border-cyan-500">
-                            <Search size={18} className="shrink-0 text-slate-400" />
-                            <input
-                                value={query}
-                                onChange={(event) => setQuery(event.target.value)}
-                                placeholder="Search bus ID, registration, route, or area..."
-                                className="w-full bg-transparent text-sm text-white outline-none placeholder:text-slate-500"
-                            />
-                        </label>
-                        <select
-                            value={statusFilter}
-                            onChange={(event) => setStatusFilter(event.target.value as StatusFilter)}
-                            className="rounded-xl border border-slate-700 bg-slate-900 px-4 py-3 text-sm text-white outline-none focus:border-cyan-500"
-                            aria-label="Filter buses by status"
-                        >
-                            <option value="All">All statuses</option>
-                            <option value="Live">Live</option>
-                            <option value="Stale">Stale</option>
-                            <option value="Offline">Offline</option>
-                        </select>
-                    </div>
-
-                    {savedMessage && (
-                        <p role="status" className="mb-4 flex items-center gap-2 rounded-xl border border-emerald-900 bg-emerald-950/40 px-4 py-3 text-sm text-emerald-300">
-                            <Check size={17} />
-                            {savedMessage}
-                        </p>
+                    {adminKey && (
+                        <button onClick={signOut} className="rounded-xl border border-zinc-700 px-4 py-2 text-sm hover:bg-zinc-900">
+                            Sign out
+                        </button>
                     )}
+                </div>
 
-                    <div className="space-y-4">
-                        {filteredFleet.map((bus) => (
-                            <article key={bus.id} className="rounded-2xl border border-slate-800 bg-slate-900/60 p-4 sm:p-5">
-                                <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-start">
-                                    <div className="min-w-0 flex-1">
-                                        <div className="flex flex-wrap items-center gap-2">
-                                            <h2 className="text-lg font-bold text-white">Bus #{bus.id} · {bus.routeName}</h2>
-                                            <span className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${statusStyles[bus.status]}`}>
-                                                {bus.status}
-                                            </span>
-                                        </div>
-                                        <p className="mt-1 text-sm text-slate-400">{bus.registrationNumber}</p>
-                                        <div className="mt-4 grid gap-3 sm:grid-cols-3">
-                                            <div>
-                                                <p className="text-xs uppercase tracking-wider text-slate-500">Current area</p>
-                                                <p className="mt-1 flex items-center gap-2 text-sm text-slate-200"><MapPin size={15} className="text-cyan-400" />{bus.currentArea}</p>
-                                            </div>
-                                            <div>
-                                                <p className="text-xs uppercase tracking-wider text-slate-500">Direction</p>
-                                                <p className="mt-1 text-sm text-slate-200">{bus.direction}</p>
-                                            </div>
-                                            <div>
-                                                <p className="text-xs uppercase tracking-wider text-slate-500">Last update (demo)</p>
-                                                <p className="mt-1 text-sm text-slate-200">{bus.lastUpdated}</p>
-                                            </div>
-                                        </div>
-                                        <div className="mt-4 flex items-start gap-2">
-                                            <RouteIcon size={16} className="mt-0.5 shrink-0 text-cyan-400" />
-                                            <div className="flex flex-wrap gap-2">
-                                                {(bus.route ?? []).map((stop) => (
-                                                    <span key={stop} className="rounded-lg border border-slate-700 px-2 py-1 text-xs text-slate-300">{stop}</span>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <div className="w-full shrink-0 lg:w-56">
-                                        <label className="mb-2 block text-xs font-semibold uppercase tracking-wider text-slate-500">Update displayed status</label>
-                                        <select
-                                            value={bus.status}
-                                            onChange={(event) => changeStatus(bus.id, event.target.value as Bus["status"])}
-                                            className="w-full rounded-xl border border-slate-700 bg-[#16001f] px-3 py-3 text-sm text-white outline-none focus:border-cyan-500"
-                                            aria-label={`Change status for bus ${bus.id}`}
-                                        >
-                                            <option value="Live">Live</option>
-                                            <option value="Stale">Stale</option>
-                                            <option value="Offline">Offline</option>
-                                        </select>
-                                        {editingBusId === bus.id && (
-                                            <p className="mt-2 text-xs text-cyan-300">Select a status to save it.</p>
-                                        )}
-                                        <button
-                                            type="button"
-                                            onClick={() => {
-                                                setEditingBusId(bus.id);
-                                                navigate(`/?bus=${bus.id}`);
-                                            }}
-                                            className="mt-2 w-full rounded-xl border border-cyan-800 px-3 py-2 text-sm font-semibold text-cyan-200 transition hover:bg-cyan-950"
-                                        >
-                                            View on map
-                                        </button>
-                                    </div>
-                                </div>
-                            </article>
-                        ))}
-                    </div>
-
-                    {filteredFleet.length === 0 && (
-                        <div className="rounded-2xl border border-dashed border-slate-700 p-10 text-center">
-                            <Search size={25} className="mx-auto text-slate-500" />
-                            <p className="mt-3 font-semibold text-white">No buses found</p>
-                            <p className="mt-1 text-sm text-slate-400">Try another search or status filter.</p>
+                {!adminKey ? (
+                    <form
+                        className="max-w-xl rounded-2xl border border-zinc-800 bg-zinc-900/70 p-5"
+                        onSubmit={(event) => {
+                            event.preventDefault();
+                            void load(keyDraft.trim());
+                        }}
+                    >
+                        <h2 className="text-lg font-semibold">Administrator access</h2>
+                        <p className="mt-1 text-sm text-zinc-400">Enter the backend ADMIN_API_KEY. It is kept in this browser tab only.</p>
+                        <label className="mt-5 block text-sm font-medium" htmlFor="admin-key">Admin key</label>
+                        <input
+                            id="admin-key"
+                            type="password"
+                            autoComplete="current-password"
+                            value={keyDraft}
+                            onChange={(event) => setKeyDraft(event.target.value)}
+                            className="mt-2 w-full rounded-xl border border-zinc-700 bg-zinc-950 px-3 py-2 outline-none focus:border-cyan-400"
+                            required
+                        />
+                        <button disabled={loading} className="mt-4 rounded-xl bg-cyan-400 px-4 py-2 font-bold text-zinc-950 disabled:opacity-50">
+                            {loading ? "Checking…" : "Open admin dashboard"}
+                        </button>
+                    </form>
+                ) : (
+                    <>
+                        {section === "requests" ? <>
+                        <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+                            <div className="flex gap-2">
+                                <button onClick={() => setFilter("pending")} className={`rounded-xl px-4 py-2 text-sm font-semibold ${filter === "pending" ? "bg-cyan-400 text-zinc-950" : "border border-zinc-700 text-zinc-300"}`}>
+                                    Pending ({requests.filter((item) => item.status === "pending").length})
+                                </button>
+                                <button onClick={() => setFilter("all")} className={`rounded-xl px-4 py-2 text-sm font-semibold ${filter === "all" ? "bg-cyan-400 text-zinc-950" : "border border-zinc-700 text-zinc-300"}`}>
+                                    All requests
+                                </button>
+                                <button onClick={() => { setSection("buses"); if (!buses.length) void loadBuses(adminKey); }} className={`rounded-xl px-4 py-2 text-sm font-semibold ${section === "buses" ? "bg-cyan-400 text-zinc-950" : "border border-zinc-700 text-zinc-300"}`}>
+                                    All buses
+                                </button>
+                            </div>
+                            <button onClick={() => void load(adminKey)} disabled={loading} className="rounded-xl border border-zinc-700 px-4 py-2 text-sm hover:bg-zinc-900 disabled:opacity-50">
+                                {loading ? "Refreshing…" : "Refresh"}
+                            </button>
                         </div>
-                    )}
-                </section>
+
+                        {visibleRequests.length === 0 ? (
+                            <div className="rounded-2xl border border-dashed border-zinc-700 px-6 py-14 text-center">
+                                <p className="text-lg font-semibold">No requests here</p>
+                                <p className="mt-1 text-sm text-zinc-400">New student requests will appear here when submitted.</p>
+                            </div>
+                        ) : (
+                            <div className="grid gap-4">
+                                {visibleRequests.map((request) => (
+                                    <article key={request.id} className="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-5">
+                                        <div className="flex flex-wrap items-start justify-between gap-3">
+                                            <div>
+                                                <div className="flex flex-wrap items-center gap-2">
+                                                    <h2 className="text-lg font-bold">Bus {request.busId} · {request.routeName}</h2>
+                                                    <span className={`rounded-full border px-2.5 py-1 text-xs font-semibold uppercase ${statusClass[request.status]}`}>{request.status}</span>
+                                                    <span className="rounded-full border border-zinc-700 px-2.5 py-1 text-xs uppercase text-zinc-300">{request.kind} request</span>
+                                                </div>
+                                                <p className="mt-1 text-sm text-zinc-400">{request.registrationNumber ?? "Details pending"} · {request.provider ?? "Provider pending"} · {request.isAC == null ? "AC status pending" : request.isAC ? "AC" : "Non-AC"}</p>
+                                            </div>
+                                            <p className="text-xs text-zinc-500">{new Date(request.submittedAt).toLocaleString()}</p>
+                                        </div>
+                                        <p className="mt-4 text-sm"><span className="font-semibold text-zinc-300">Reason: </span>{request.reason}</p>
+                                        <p className="mt-2 text-sm"><span className="font-semibold text-zinc-300">Stops: </span>{request.route?.join(" → ") || "Route stops to be configured by admin"}</p>
+                                        <p className="mt-2 break-all text-sm">
+                                            <span className="font-semibold text-zinc-300">GPS link: </span>
+                                            <a href={request.gpsLink} target="_blank" rel="noreferrer" className="text-cyan-300 underline underline-offset-2">{request.gpsLink}</a>
+                                        </p>
+                                        {request.reviewNote && <p className="mt-3 rounded-xl bg-zinc-950 p-3 text-sm text-zinc-300">Review note: {request.reviewNote}</p>}
+                                        {request.status === "pending" ? (
+                                            <div className="mt-5 flex flex-wrap gap-2">
+                                                <button disabled={busyId === request.id} onClick={() => void decide(request, "approved")} className="rounded-xl bg-emerald-400 px-4 py-2 text-sm font-bold text-zinc-950 disabled:opacity-50">Approve request</button>
+                                                <button disabled={busyId === request.id} onClick={() => void decide(request, "rejected")} className="rounded-xl border border-rose-500/60 px-4 py-2 text-sm font-semibold text-rose-200 hover:bg-rose-950/40 disabled:opacity-50">Reject</button>
+                                            </div>
+                                        ) : request.status !== "archived" ? (
+                                            <div className="mt-5">
+                                                <button disabled={busyId === request.id} onClick={() => void decide(request, "archived")} className="rounded-xl border border-zinc-700 px-4 py-2 text-sm hover:bg-zinc-800 disabled:opacity-50">Archive request</button>
+                                            </div>
+                                        ) : null}
+                                    </article>
+                                ))}
+                            </div>
+                        )}
+                        </> : <section className="space-y-5">
+                            <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-xl font-bold">All configured buses</h2><p className="text-sm text-zinc-400">Edit the authoritative bus configuration here.</p></div><button onClick={() => void loadBuses(adminKey)} disabled={busBusy} className="rounded-xl border border-zinc-700 px-4 py-2 text-sm hover:bg-zinc-900">{busBusy ? "Loading…" : "Refresh buses"}</button></div>
+                            {buses.length === 0 ? <p className="rounded-xl border border-zinc-800 p-5 text-zinc-400">No configured buses loaded. Click Refresh buses.</p> : <form onSubmit={saveBus} className="space-y-4 rounded-2xl border border-zinc-800 bg-zinc-900/70 p-5">
+                                <div><label className="mb-1 block text-sm text-zinc-300">Select bus</label><select className="w-full rounded-xl border border-zinc-700 bg-zinc-950 px-3 py-2 text-zinc-100" value={selectedBusId} onChange={event => { const id = event.target.value; setSelectedBusId(id); setBusForm(buses.find(bus => String(bus.busId) === id) ?? null); }}>{buses.map(bus => <option key={bus.busId} value={bus.busId}>Bus {bus.busId} · {bus.registrationNumber} · {bus.routeName}</option>)}</select></div>
+                                {busForm && <>
+                                    <div className="grid gap-4 sm:grid-cols-2">
+                                    <div><label className="mb-1 block text-sm text-zinc-300">Bus ID</label><input readOnly value={busForm.busId} className="w-full rounded-xl border border-zinc-700 bg-zinc-800 px-3 py-2 text-zinc-400"/></div>
+                                    <div><label className="mb-1 block text-sm text-zinc-300">Registration number</label><input required value={busForm.registrationNumber} onChange={e => setBusForm({...busForm,registrationNumber:e.target.value})} className="w-full rounded-xl border border-zinc-700 bg-zinc-950 px-3 py-2 text-zinc-100"/></div>
+                                    <div><label className="mb-1 block text-sm text-zinc-300">Route name</label><input required value={busForm.routeName} onChange={e => setBusForm({...busForm,routeName:e.target.value})} className="w-full rounded-xl border border-zinc-700 bg-zinc-950 px-3 py-2 text-zinc-100"/></div>
+                                    <div><label className="mb-1 block text-sm text-zinc-300">GPS provider</label><select value={busForm.provider} onChange={e => setBusForm({...busForm,provider:e.target.value as BusConfigRecord["provider"]})} className="w-full rounded-xl border border-zinc-700 bg-zinc-950 px-3 py-2 text-zinc-100"><option value="vamosys">Vamosys</option><option value="paizogps">PaizoGPS</option></select></div>
+                                    <div><label className="mb-1 block text-sm text-zinc-300">Current area fallback</label><input value={busForm.currentArea ?? ""} onChange={e => setBusForm({...busForm,currentArea:e.target.value})} className="w-full rounded-xl border border-zinc-700 bg-zinc-950 px-3 py-2 text-zinc-100"/></div>
+                                    <div><label className="mb-1 block text-sm text-zinc-300">Direction</label><input value={busForm.direction ?? ""} onChange={e => setBusForm({...busForm,direction:e.target.value})} className="w-full rounded-xl border border-zinc-700 bg-zinc-950 px-3 py-2 text-zinc-100"/></div></div>
+                                    <div><label className="mb-1 block text-sm text-zinc-300">GPS tracking URL</label><input type="url" required value={busForm.trackingUrl ?? ""} onChange={e => setBusForm({...busForm,trackingUrl:e.target.value})} className="w-full rounded-xl border border-zinc-700 bg-zinc-950 px-3 py-2 text-zinc-100"/></div>
+                                    <div><label className="mb-1 block text-sm text-zinc-300">Route stops (comma-separated)</label><input required value={busForm.route.join(", ")} onChange={e => setBusForm({...busForm,route:e.target.value.split(",").map(s=>s.trim()).filter(Boolean)})} className="w-full rounded-xl border border-zinc-700 bg-zinc-950 px-3 py-2 text-zinc-100"/></div>
+                                    <label className="flex items-center gap-2 text-sm text-zinc-300"><input type="checkbox" checked={busForm.isAC} onChange={e => setBusForm({...busForm,isAC:e.target.checked})}/> AC bus</label>
+                                    <button disabled={busBusy} className="rounded-xl bg-cyan-400 px-4 py-2 font-bold text-zinc-950 disabled:opacity-50">{busBusy ? "Saving…" : "Save bus changes"}</button>
+                                </>}
+                            </form>}
+                        </section>}
+                    </>
+                )}
+
+                {error && <p role="alert" className="mt-5 rounded-xl border border-rose-800 bg-rose-950/50 p-3 text-sm text-rose-200">{error}</p>}
+                {notice && <p role="status" className="mt-5 rounded-xl border border-emerald-800 bg-emerald-950/50 p-3 text-sm text-emerald-200">{notice}</p>}
             </div>
         </main>
     );

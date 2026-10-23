@@ -10,21 +10,21 @@ import {
     Compass,
     CircleHelp,
     Route as RouteIcon,
-    Star,
     ShieldCheck,
 } from "lucide-react";
-import { buses } from "../../data/buses";
+import type { Bus } from "../../types/bus";
+
 
 const faqs = [
     {
         question: "How do I find my college bus?",
         answer:
-            "Use the search bar on the map to search by bus ID, route name, or current area. Select a result to view its details. The locations and statuses shown in this demo are mock data.",
+            "Use the search bar to search by bus ID, route name, or current area. Select a result to view its details and explore the bus route.",
     },
     {
         question: "What do Live, Stale, and Offline mean?",
         answer:
-            "Live means the bus has a recent location in the current demo data. Stale means its displayed location may be old. Offline means a current location is not available. Do not treat mock positions as real-time vehicle tracking.",
+            "Live means the bus has a recent location update. Stale means its displayed location may be old. Offline means a recent usable location is unavailable.",
     },
     {
         question: "How do I save a bus I use regularly?",
@@ -34,12 +34,12 @@ const faqs = [
     {
         question: "Can I share a bus with a friend?",
         answer:
-            "Open the bus details and use Share. Smart Commute creates a link to that bus. The link works for other people only when they can access the same deployed app or reachable network address.",
+            "Open the bus details and use Share. Smart Commute creates a link to that bus. The link works for others when they can access the same deployed app or reachable network address.",
     },
     {
         question: "What if a bus or pickup point is missing?",
         answer:
-            "Check the route name and nearby areas first. This version uses a small demonstration dataset, so not every college route or pickup point is represented.",
+            "Try searching by route name or nearby area. If you still cannot find the bus, contact the college transport office for route information.",
     },
     {
         question: "How do I choose a suitable route?",
@@ -59,7 +59,7 @@ const steps = [
         number: "02",
         title: "Check the details",
         description:
-            "Review the displayed route, current area, direction, and status. Treat this demo's fleet data as illustrative.",
+            "Review the displayed route, current area, direction, and status. Use the displayed route and status information to plan your commute.",
     },
     {
         number: "03",
@@ -75,14 +75,14 @@ const steps = [
     },
 ];
 
-export default function FreshersMode() {
+export default function FreshersMode({fleet}:{fleet:Bus[]}) {
     const navigate = useNavigate();
     const [query, setQuery] = useState("");
     const [openFaq, setOpenFaq] = useState<number | null>(0);
 
     const recommendations = useMemo(() => {
         const normalized = query.trim().toLowerCase();
-        return buses.filter((bus) => {
+        return fleet.filter((bus) => {
             if (!normalized) return true;
             const searchable = [
                 String(bus.id),
@@ -214,7 +214,7 @@ export default function FreshersMode() {
                             <BusFront size={22} />
                         </div>
                         <div>
-                            <h2 className="text-xl font-bold text-white sm:text-2xl">Explore buses in the demo</h2>
+                            <h2 className="text-xl font-bold text-white sm:text-2xl">Explore buses</h2>
                             <p className="mt-1 text-sm text-slate-400">Search by bus ID, route, area, or listed route point.</p>
                         </div>
                     </div>
@@ -249,7 +249,7 @@ export default function FreshersMode() {
                                 </div>
                                 <p className="mt-4 flex items-center gap-2 text-sm text-slate-300">
                                     <MapPin size={15} className="text-cyan-400" />
-                                    Current demo area: {bus.currentArea}
+                                    Current area: {bus.currentArea}
                                 </p>
                                 <div className="mt-3 flex flex-wrap gap-2">
                                     {(bus.route ?? []).map((stop) => (
@@ -270,13 +270,10 @@ export default function FreshersMode() {
                     {recommendations.length === 0 && (
                         <div className="mt-4 rounded-2xl border border-dashed border-slate-700 p-8 text-center">
                             <Search className="mx-auto text-slate-500" size={25} />
-                            <p className="mt-3 font-semibold text-white">No matching demo buses</p>
+                            <p className="mt-3 font-semibold text-white">No matching buses</p>
                             <p className="mt-1 text-sm text-slate-400">Try a different bus ID, route, or area.</p>
                         </div>
                     )}
-                    <p className="mt-4 text-xs leading-5 text-amber-200/80">
-                        Demo-data note: the current bus list is small and illustrative. “Recommendations” are not based on actual popularity, official pickup-point records, or live fleet telemetry.
-                    </p>
                 </section>
 
                 <section className="mt-10">

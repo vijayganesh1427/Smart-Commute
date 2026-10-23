@@ -1,11 +1,40 @@
 import { Router } from "express";
 import { routeWaypoints } from "../data/routeWay.js";
-import { buses } from "../data/buses.js";
 import type { CachedRoute } from "../types/cachedRouteProps.js";
+import { getFleet, getBusById } from "../services/fleetService.js";
 
 const router = Router();
 
 const routeCache = new Map<number, CachedRoute>();
+
+// Fleet endpoints return provider-independent, normalized bus objects.
+router.get("/", async (_req, res) => {
+    try {
+        const fleet = await getFleet();
+        res.setHeader("Cache-Control", "no-store");
+        return res.json({ source: "mock-gps-demo", count: fleet.length, buses: fleet });
+    } catch (error) {
+        console.error("Fleet fetch failed:", error);
+        return res.status(500).json({ error: "Failed to load fleet data" });
+    }
+});
+
+router.get("/:busId", async (req, res, next) => {
+    // Keep the existing /:busId/route endpoint distinct.
+    if (req.path.endsWith("/route")) return next();
+    const busId = Number(req.params.busId);
+    if (!Number.isInteger(busId) || busId <= 0) {
+        return res.status(400).json({ error: "Invalid bus ID" });
+    }
+    try {
+        const bus = await getBusById(busId);
+        if (!bus) return res.status(404).json({ error: "Bus not found" });
+        return res.json(bus);
+    } catch (error) {
+        console.error("Bus lookup failed:", error);
+        return res.status(500).json({ error: "Failed to load bus data" });
+    }
+});
 
 // Distance between two latitude/longitude coordinates, in kilometres.
 function getDistance(
@@ -33,6 +62,16 @@ function getDistance(
         2 *
         Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
     );
+}
+
+function getEstimatedAverageSpeed(now = new Date()): number {
+    const hour = now.getHours();
+
+    if (hour >= 6 && hour < 11) return 30;
+    if (hour >= 11 && hour < 16) return 26;
+    if (hour >= 16) return 23;
+
+    return 30;
 }
 
 // Approximate the remaining route distance using the nearest
@@ -77,11 +116,18 @@ router.get("/:busId/route", async (req, res) => {
         }
 
         const points = routeWaypoints[busId];
-        const bus = buses.find((item) => item.id === busId);
 
-        if (!points || !bus) {
+        if (!points) {
             return res.status(404).json({
-                error: "Bus or route not found",
+                error: `No route configured for bus ${busId}`,
+            });
+        }
+
+        const bus = await getBusById(busId);
+
+        if (!bus) {
+            return res.status(404).json({
+                error: `Bus ${busId} not found in the GPS fleet`,
             });
         }
 
@@ -149,9 +195,11 @@ router.get("/:busId/route", async (req, res) => {
             cachedRoute.route
         );
 
+        const averageSpeed = getEstimatedAverageSpeed();
+
         const etaMinutes =
-            bus.status === "Live" && bus.speed > 0
-                ? Math.ceil((remainingDistanceKm / bus.speed) * 60)
+            bus.status !== "Offline"
+                ? Math.ceil((remainingDistanceKm / averageSpeed) * 60)
                 : null;
 
         return res.json({

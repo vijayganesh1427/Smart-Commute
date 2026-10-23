@@ -6,7 +6,7 @@ export default function BottomSheet({
     children2,
 }: BottomSheetProps) {
 
-    const COLLAPSED_HEIGHT = 120;
+    const COLLAPSED_HEIGHT = 200;
     const EXPANDED_HEIGHT = window.innerHeight * 0.35;
 
     const [sheetHeight, setSheetHeight] = useState(COLLAPSED_HEIGHT);

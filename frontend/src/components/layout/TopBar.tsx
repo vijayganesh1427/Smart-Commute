@@ -1,99 +1,99 @@
-import { Activity, BusFront } from "lucide-react";
+
+import {
+    Activity,
+    BusFront,
+    GraduationCap,
+    ShieldCheck,
+    ChevronRight,
+} from "lucide-react";
 import { APP_NAME, APP_TAGLINE } from "../../constants/app";
 import { useNavigate, useLocation } from "react-router-dom";
+
+const navItems = [
+    { label: "My Fleet", path: "/my-fleet", icon: BusFront },
+    { label: "Analytics", path: "/analytics", icon: Activity },
+    { label: "Freshers", path: "/freshers", icon: GraduationCap },
+    { label: "Fleet Admin", path: "/admin/fleet", icon: ShieldCheck },
+];
 
 export default function TopBar() {
     const navigate = useNavigate();
     const location = useLocation();
-    const isAnalyticsPage = location.pathname === "/analytics";
-    const isMyFleetPage = location.pathname === "/my-fleet";
 
     return (
         <header
             className="
-                absolute
-                top-0
-                left-0
-                right-0
-                z-10
-                h-40 sm:h-20
-                flex
-                flex-col
-                items-start
-                px-4 sm:px-6
-                py-2 sm:py-4
-                bg-[linear-gradient(to_bottom,rgb(22,0,31)_0%,rgba(22,0,31,0.95)_25%,rgba(22,0,31,0.85)_50%,rgba(22,0,31,0.6)_75%,transparent_100%)]
-                sm:bg-[rgb(22,0,31)]
-                sm:backdrop-blur-md
-                sm:border-b
-                sm:border-cyan-200
-                sm:shadow-sm
+                absolute inset-x-0 top-0 z-30
+                border-b border-cyan-400/50
+                bg-gradient-to-r from-[#16001f]/95
+                via-[#190525]/95 to-[#071b25]/95
+                px-3 py-2 backdrop-blur-xl
+                sm:px-5 sm:py-3
             "
         >
-            <div className="flex flex-wrap items-center gap-2 text-white sm:gap-3">
-                <BusFront
-                    size={28}
-                    className="shrink-0 text-red-500 sm:h-[30px] sm:w-[30px]"
-                />
-
+            <div className="
+                flex flex-col gap-2
+                sm:flex-row sm:items-center sm:justify-between sm:gap-4
+            ">
                 <button
                     type="button"
                     onClick={() => navigate("/")}
-                    className="mr-auto text-left"
                     aria-label="Go to Smart Commute map"
+                    className="flex min-w-0 items-center gap-2 text-left sm:gap-3"
                 >
-                    <h1 className="pb-1 text-xl font-bold text-cyan-400">
-                        {APP_NAME}
-                    </h1>
-                    <p className="hidden text-xs text-gray-100 sm:block">
-                        {APP_TAGLINE}
-                    </p>
+                    <div className="
+                        flex h-9 w-9 shrink-0 items-center justify-center
+                        rounded-xl border border-red-400/20 bg-red-500/10
+                        sm:h-11 sm:w-11
+                    ">
+                        <BusFront className="h-6 w-6 text-red-400 sm:h-7 sm:w-7" />
+                    </div>
+
+                    <div className="min-w-0">
+                        <h1 className="truncate text-lg font-extrabold tracking-tight text-cyan-300 sm:text-2xl">
+                            {APP_NAME}
+                        </h1>
+                        <p className="hidden text-xs text-slate-300 sm:block">
+                            {APP_TAGLINE}
+                        </p>
+                    </div>
                 </button>
 
-                <button
-                    type="button"
-                    onClick={() => navigate("/my-fleet")}
-                    aria-current={isMyFleetPage ? "page" : undefined}
-                    className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm transition ${
-                        isMyFleetPage
-                            ? "border-cyan-400 bg-cyan-900/70 text-cyan-100"
-                            : "border-cyan-500 bg-cyan-950 text-[#cbd5e1] hover:bg-cyan-900"
-                    }`}
+                <nav
+                    aria-label="Main navigation"
+                    className="
+                        flex max-w-full gap-2 overflow-x-auto pb-0.5
+                        sm:justify-end
+                    "
                 >
-                    <BusFront size={16} />
-                    My Fleet
-                </button>
+                    {navItems.map(({ label, path, icon: Icon }) => {
+                        const active = location.pathname === path ||
+                            location.pathname.startsWith(`${path}/`);
 
-                <button
-                    type="button"
-                    onClick={() => navigate("/analytics")}
-                    aria-current={isAnalyticsPage ? "page" : undefined}
-                    className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm transition ${
-                        isAnalyticsPage
-                            ? "border-cyan-400 bg-cyan-900/70 text-cyan-100"
-                            : "border-cyan-500 bg-cyan-950 text-[#cbd5e1] hover:bg-cyan-900"
-                    }`}
-                >
-                    <Activity size={16} />
-                    Analytics
-                </button>
-
-                <button
-                    type="button"
-                    onClick={() => navigate("/freshers")}
-                    className="border border-cyan-500 rounded-lg p-2 text-[#cbd5e1] bg-cyan-950"
-                    >
-                    Freshers
-                </button>
-                
-                <button
-                    type="button"
-                    onClick={() => navigate("/admin/fleet")}
-                    className="border border-cyan-500 rounded-lg p-2 text-[#cbd5e1] bg-cyan-950"
-                    >
-                    Fleet Admin
-                </button>
-
+                        return (
+                            <button
+                                key={path}
+                                type="button"
+                                onClick={() => navigate(path)}
+                                aria-current={active ? "page" : undefined}
+                                className={`
+                                    inline-flex shrink-0 items-center gap-1.5
+                                    rounded-xl border px-3 py-2 text-xs
+                                    font-semibold transition sm:gap-2 sm:px-3.5 sm:py-2.5 sm:text-sm
+                                    ${
+                                        active
+                                            ? "border-cyan-300/50 bg-cyan-400/15 text-cyan-100"
+                                            : "border-white/20 bg-white/[0.035] text-slate-300 hover:border-cyan-400/40 hover:bg-cyan-400/[0.08]"
+                                    }
+                                `}
+                            >
+                                <Icon size={16} />
+                                <span>{label}</span>
+                                {active && <ChevronRight size={13} />}
+                            </button>
+                        );
+                    })}
+                </nav>
             </div>
         </header>
     );

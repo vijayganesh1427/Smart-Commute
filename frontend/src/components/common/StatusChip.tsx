@@ -15,8 +15,8 @@ export default function StatusChip({
             <div className="
                 relative
                 flex items-center justify-center
-                bg-slate-900/80
-                border border-slate-700
+                bg-slate-900/10
+                border border-slate-600
                 rounded
                 px-1 sm:px-2
                 py-0.5
@@ -62,7 +62,7 @@ export default function StatusChip({
         ">
             <div
                 className={`
-                    w-2.5 h-2.5 sm:w-3 sm:h-3
+                    w-3 h-3 sm:w-4 sm:h-4
                     rounded
                     border
                     ${bgStyle}

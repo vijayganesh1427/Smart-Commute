@@ -1,86 +1,131 @@
-import { MapContainer, Marker, Polyline } from "react-leaflet";
+
+import { MapContainer, Marker, Polyline, useMap } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { setWorkerUrl } from "maplibre-gl";
 import maplibreWorker from "maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url";
 import { useState, useEffect } from "react";
 import BusMarker from "./BusMarker";
-//import { buses } from "../../data/buses";
 import type { UserLocation, MapViewProps } from "../../types/mapsProps";
 import UserMarker from "./UserMarker";
 import DestinationMarker from "./DestinationMarker";
 import DarkMapLayer from "./DarkMapLayer";
 import type { LatLngExpression } from "leaflet";
 import L from "leaflet";
-import { getBusRoute } from "../../services/routeService";
 import type { BusRouteResponse } from "../../services/routeService";
-//import SourceMarker from "./SourceMarker";
+
 setWorkerUrl(maplibreWorker);
-export default function MapView({buses,selBus,filBus,onRouteDataChange,onBusSel}:MapViewProps) {
-    const [userLoc,setUserLoc]=useState<UserLocation|null>(null);
-    const [route, setRoute] = useState<LatLngExpression[]>([]);
-    const [routeData, setRouteData] = useState<BusRouteResponse | null>(null);
-    useEffect(()=>{
-                const onSuccess=(position: GeolocationPosition)=>
-                    setUserLoc({lat: position.coords.latitude,long: position.coords.longitude});
-                const onFail=()=>
-                    console.log("error");
-                navigator.geolocation.getCurrentPosition(onSuccess,onFail);
-            },
-            []
-    )
+
+function MapInteractions() {
+    const map = useMap();
+
     useEffect(() => {
-        let cancelled = false;
-
-        if (!selBus) {
-            setRoute([]);
-            onRouteDataChange(null);
-            return;
-        }
-
-        setRoute([]);
-
-        const fetchRoute = async () => {
-            try {
-                const data = await getBusRoute(selBus.id);
-
-                if (cancelled) return;
-
-                setRoute(data.route);
-                onRouteDataChange(data);
-            } catch (error) {
-                if (cancelled) return;
-
-                console.error("Route fetching failed:", error);
-                setRoute([]);
-                onRouteDataChange(null);
+        const locateUser = () => {
+            if (!navigator.geolocation) {
+                alert("Geolocation is not supported by this browser.");
+                return;
             }
+
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    const { latitude, longitude } = position.coords;
+                    map.flyTo([latitude, longitude], 12, {
+                        animate: true,
+                        duration: 1.2,
+                    });
+                },
+                (error) => {
+                    console.error("Unable to get user location:", error);
+
+                    if (error.code === error.PERMISSION_DENIED) {
+                        alert("Please allow location access in your browser.");
+                    } else {
+                        alert("Unable to get your location. Please try again.");
+                    }
+                },
+                {
+                    enableHighAccuracy: true,
+                    timeout: 10000,
+                    maximumAge: 0,
+                }
+            );
         };
 
-        fetchRoute();
+        window.addEventListener("smart-commute:locate-user", locateUser);
 
         return () => {
-            cancelled = true;
+            window.removeEventListener("smart-commute:locate-user", locateUser);
         };
-    }, [selBus?.id, onRouteDataChange]);
-    
-    let busesToDisplay = buses;
-    if (filBus?.length > 0) {
-        busesToDisplay = filBus;
+    }, [map]);
 
-        if (selBus && !filBus.some(bus => bus.id === selBus.id)) {
-            busesToDisplay = [...filBus, selBus];
-        }
+    return null;
+}
+
+type SharedMapViewProps = Omit<MapViewProps, "onRouteDataChange"> & {
+    routeData: BusRouteResponse | null;
+};
+
+export default function MapView({
+    buses,
+    selBus,
+    filBus,
+    onBusSel,
+    favoriteBuses = [],
+    favoritesOnly = false,
+    routeData,
+}: SharedMapViewProps) {
+    const [userLoc, setUserLoc] = useState<UserLocation | null>(null);
+
+    useEffect(() => {
+        if (!navigator.geolocation) return;
+
+        navigator.geolocation.getCurrentPosition(
+            (position) => {
+                setUserLoc({
+                    lat: position.coords.latitude,
+                    long: position.coords.longitude,
+                });
+            },
+            (error) => {
+                console.warn("Unable to retrieve initial user location:", error);
+            },
+            { maximumAge: 60_000, timeout: 10_000 }
+        );
+    }, []);
+
+    let busesToDisplay = buses;
+
+    if (favoritesOnly) {
+        busesToDisplay = buses.filter((bus) =>
+            favoriteBuses.includes(bus.id)
+        );
+    } else if (filBus.length > 0) {
+        busesToDisplay = filBus;
     }
-    const DestIcon=L.divIcon({
+
+    if (
+        selBus &&
+        !busesToDisplay.some((bus) => bus.id === selBus.id) &&
+        !favoritesOnly
+    ) {
+        busesToDisplay = [...busesToDisplay, selBus];
+    }
+
+    const DestIcon = L.divIcon({
         className: "",
         html: `<div style="width:16px;height:16px;border-radius:4px;background:#22315c;border:2px solid #fff;box-shadow:0 2px 6px rgba(16,24,38,.4)"></div>`,
         iconSize: [16, 16],
         iconAnchor: [8, 8],
-        });
+    });
+
+    const route: LatLngExpression[] =
+        routeData && routeData.busId === selBus?.id
+            ? routeData.route
+            : [];
+
     return (
         <MapContainer
-            center={[12.9727, 80.1757]}
+            center={[12.9427, 80.1757]}
             zoom={11}
             minZoom={9}
             maxBounds={[[180, -Infinity], [-180, Infinity]]}
@@ -88,9 +133,14 @@ export default function MapView({buses,selBus,filBus,onRouteDataChange,onBusSel}
             maxBoundsViscosity={1}
             className="h-full w-full"
         >
+            <MapInteractions />
             <DarkMapLayer />
-            {userLoc && <UserMarker position={[userLoc.lat,userLoc.long]}/>}
-            {busesToDisplay.map(bus => (
+
+            {userLoc && (
+                <UserMarker position={[userLoc.lat, userLoc.long]} />
+            )}
+
+            {busesToDisplay.map((bus) => (
                 <BusMarker
                     key={bus.id}
                     bus={bus}
@@ -98,7 +148,7 @@ export default function MapView({buses,selBus,filBus,onRouteDataChange,onBusSel}
                     onSelect={onBusSel}
                 />
             ))}
-            {/*selBus && <SourceMarker position={routeWaypoints[selBus.id][0]} />*/}
+
             {route.length > 0 && (
                 <Polyline
                     positions={route}
@@ -109,7 +159,12 @@ export default function MapView({buses,selBus,filBus,onRouteDataChange,onBusSel}
                     }}
                 />
             )}
-            {selBus?<DestinationMarker position={[12.8405,80.153]}/>:<Marker position={[12.8405,80.153]} icon={DestIcon}/>}
+
+            {selBus ? (
+                <DestinationMarker position={[12.8405, 80.153]} />
+            ) : (
+                <Marker position={[12.8405, 80.153]} icon={DestIcon} />
+            )}
         </MapContainer>
     );
 }

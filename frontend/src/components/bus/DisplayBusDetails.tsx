@@ -209,12 +209,10 @@ export default function DisplayBusDetails({
                     {bus.route?.map(bus=>
                         <>
                             {bus}
-                            <span className="mx-2 text-zinc-500">
+                            {bus!="VIT Chennai" && <span className="mx-2 text-zinc-500">
                                 →
-                            </span>
+                            </span>}
                         </>)}
-
-                    VIT Chennai
                 </div>
             </div>
 

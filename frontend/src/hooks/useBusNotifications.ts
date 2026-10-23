@@ -1,6 +1,6 @@
+
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Bus } from "../types/bus";
-//import { buses } from "../data/buses";
 
 type BusStatus = Bus["status"];
 
@@ -17,21 +17,21 @@ export interface BusNotification {
     type: "recovery" | "proximity";
 }
 
-const PROXIMITY_RADIUS_KM = 55;
-const PROXIMITY_CHECK_INTERVAL_MS = 5000;
+const PROXIMITY_RADIUS_KM = 1;
+const PROXIMITY_CHECK_INTERVAL_MS = 5_000;
 
 function getDistanceKm(
     pointA: Coordinates,
-    pointB: Coordinates
+    pointB: Coordinates,
 ): number {
     const earthRadiusKm = 6371;
     const toRadians = (degrees: number) => (degrees * Math.PI) / 180;
 
     const latitudeDifference = toRadians(
-        pointB.latitude - pointA.latitude
+        pointB.latitude - pointA.latitude,
     );
     const longitudeDifference = toRadians(
-        pointB.longitude - pointA.longitude
+        pointB.longitude - pointA.longitude,
     );
 
     const a =
@@ -40,79 +40,114 @@ function getDistanceKm(
             Math.cos(toRadians(pointB.latitude)) *
             Math.sin(longitudeDifference / 2) ** 2;
 
-    return earthRadiusKm * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    // Protect against floating-point rounding outside [0, 1].
+    const safeA = Math.min(1, Math.max(0, a));
+
+    return (
+        2 *
+        earthRadiusKm *
+        Math.atan2(Math.sqrt(safeA), Math.sqrt(1 - safeA))
+    );
 }
 
 export function useBusNotifications(
-  favoriteBuses: number[],
-  fleet: Bus[],
-  updateBusStatus: (busId: number, status: Bus["status"]) => void
+    favoriteBuses: number[],
+    fleet: Bus[],
 ) {
     const [notifications, setNotifications] = useState<BusNotification[]>([]);
     const [permission, setPermission] = useState<NotificationPermission>(
-        typeof Notification === "undefined"
-            ? "denied"
-            : Notification.permission
+        () =>
+            typeof Notification === "undefined"
+                ? "denied"
+                : Notification.permission,
     );
+
     const [userLocation, setUserLocation] =
         useState<Coordinates | null>(null);
+
     const [locationAvailable, setLocationAvailable] = useState(false);
 
-    const previousStatuses = useRef(
-        new Map<number, BusStatus>(fleet.map((bus) => [bus.id, bus.status]))
-    );
-    const favoriteIds = useRef(favoriteBuses);
-    const insideRadius = useRef(new Set<number>());
-    const notifiedRecovery = useRef(new Set<number>());
+    // Keep the latest values available to long-lived effects and timers.
+    const fleetRef = useRef<Bus[]>(fleet);
+    const favoriteIdsRef = useRef<number[]>(favoriteBuses);
+    const userLocationRef = useRef<Coordinates | null>(userLocation);
 
-    favoriteIds.current = favoriteBuses;
+    fleetRef.current = fleet;
+    favoriteIdsRef.current = favoriteBuses;
+    userLocationRef.current = userLocation;
+
+    // undefined means the initial fleet has not been processed yet.
+    const previousStatusesRef = useRef<Map<number, BusStatus> | null>(null);
+
+    // Tracks which buses are currently within the radius.
+    const insideRadiusRef = useRef(new Set<number>());
 
     const addNotification = useCallback(
         (
             bus: Bus,
             message: string,
-            type: BusNotification["type"]
+            type: BusNotification["type"],
         ) => {
             const notification: BusNotification = {
-                id: `${bus.id}-${type}-${Date.now()}`,
+                id: `${bus.id}-${type}-${Date.now()}-${Math.random()
+                    .toString(36)
+                    .slice(2, 8)}`,
                 busId: bus.id,
                 message,
                 createdAt: new Date(),
                 type,
             };
-    
-            // Always add the in-app notification first.
-            // Native notification failures must not break the UI.
+
             setNotifications((current) => [notification, ...current]);
-    
-            
-                if (
-                typeof Notification !== "undefined" &&
-                Notification.permission === "granted"
+
+            // Native notification support is optional.
+            if (
+                typeof Notification === "undefined" ||
+                Notification.permission !== "granted"
             ) {
-                if ("serviceWorker" in navigator) {
-                    navigator.serviceWorker.ready
-                        .then((registration) =>
-                            registration.showNotification("Smart Commute", {
-                                body: message,
-                                icon: "/favicon.ico",
-                                tag: `bus-${bus.id}-${type}`,
-                            })
-                        )
-                        .catch((error) => {
-                            console.error("Notification display failed:", error);
-                        });
-                } else {
-                    console.warn("Service Workers are not supported.");
+                return;
+            }
+
+            const options: NotificationOptions = {
+                body: message,
+                icon: "/favicon.ico",
+                tag: `bus-${bus.id}-${type}`,
+            };
+
+            if ("serviceWorker" in navigator) {
+                navigator.serviceWorker.ready
+                    .then((registration) =>
+                        registration.showNotification(
+                            "Smart Commute",
+                            options,
+                        ),
+                    )
+                    .catch((error: unknown) => {
+                        console.error(
+                            "Native notification display failed:",
+                            error,
+                        );
+                    });
+            } else {
+                try {
+                    new Notification("Smart Commute", options);
+                } catch (error) {
+                    console.error(
+                        "Native notification display failed:",
+                        error,
+                    );
                 }
             }
         },
-        []
+        [],
     );
 
-    // Optional user location: notifications still work without permission.
+    // Optional user location.
     useEffect(() => {
-        if (!navigator.geolocation) return;
+        if (!navigator.geolocation) {
+            setLocationAvailable(false);
+            return;
+        }
 
         const watchId = navigator.geolocation.watchPosition(
             (position) => {
@@ -128,140 +163,150 @@ export function useBusNotifications(
             },
             {
                 enableHighAccuracy: false,
-                maximumAge: 15000,
-                timeout: 10000,
-            }
+                maximumAge: 15_000,
+                timeout: 10_000,
+            },
         );
 
         return () => navigator.geolocation.clearWatch(watchId);
     }, []);
 
-    // Notify when a favourite bus transitions from Stale/Offline to Live.
+    // Track genuine status transitions. The first fleet response establishes
+    // a baseline and must not generate recovery notifications.
     useEffect(() => {
+        if (fleet.length === 0) return;
+
+        const previousStatuses = previousStatusesRef.current;
+        const currentStatuses = new Map<number, BusStatus>();
+
         for (const bus of fleet) {
-            const previous = previousStatuses.current.get(bus.id);
-            const current = bus.status;
+            currentStatuses.set(bus.id, bus.status);
+        }
 
-            // Register newly encountered buses without generating alerts.
-            if (previous === undefined) {
-                previousStatuses.current.set(bus.id, current);
-                continue;
-            }
+        if (previousStatuses === null) {
+            previousStatusesRef.current = currentStatuses;
+            return;
+        }
 
-            // No transition occurred.
-            if (previous === current) continue;
+        for (const bus of fleet) {
+            const previous = previousStatuses.get(bus.id);
 
-            // Save the new status before processing the transition.
-            previousStatuses.current.set(bus.id, current);
+            // Newly added buses establish a baseline without an alert.
+            if (previous === undefined) continue;
 
-            const isRecovery =
-                current === "Live" &&
+            const recovered =
+                bus.status === "Live" &&
                 (previous === "Stale" || previous === "Offline");
 
-            if (isRecovery && favoriteIds.current.includes(bus.id)) {
+            if (
+                recovered &&
+                favoriteIdsRef.current.includes(bus.id)
+            ) {
                 addNotification(
                     bus,
                     `${bus.routeName} is back online.`,
-                    "recovery"
+                    "recovery",
                 );
             }
         }
+
+        // Replace the snapshot so removed buses do not linger.
+        previousStatusesRef.current = currentStatuses;
     }, [fleet, addNotification]);
 
-    // Notify once when a live favourite bus enters the proximity radius.
-    // Notify once when a favourite bus enters the radius while Live.
-useEffect(() => {
-    if (!userLocation) return;
+    // Run one proximity timer. Refs ensure it always uses the latest fleet,
+    // favorites and location without restarting the timer on every refresh.
+    useEffect(() => {
+        const checkProximity = () => {
+            const location = userLocationRef.current;
 
-    const checkProximity = () => {
-        for (const bus of fleet) {
-            if (!favoriteIds.current.includes(bus.id)) {
-                insideRadius.current.delete(bus.id);
-                continue;
-            }
+            if (!location) return;
 
-            const distance = getDistanceKm(userLocation, {
-                latitude: bus.latitude,
-                longitude: bus.longitude,
-            });
+            const favoriteIds = new Set(favoriteIdsRef.current);
+            const currentInside = insideRadiusRef.current;
+            const nextInside = new Set<number>();
 
-            const isInside = distance <= PROXIMITY_RADIUS_KM;
-            const wasInside = insideRadius.current.has(bus.id);
+            for (const bus of fleetRef.current) {
+                if (!favoriteIds.has(bus.id)) continue;
 
-            if (isInside) {
-                // Record entry even if the bus is currently not Live.
-                insideRadius.current.add(bus.id);
+                const validCoordinates =
+                    Number.isFinite(bus.latitude) &&
+                    Number.isFinite(bus.longitude) &&
+                    bus.latitude >= -90 &&
+                    bus.latitude <= 90 &&
+                    bus.longitude >= -180 &&
+                    bus.longitude <= 180;
 
-                if (!wasInside && bus.status === "Live") {
-                    addNotification(
-                        bus,
-                        `${bus.routeName} is within ${PROXIMITY_RADIUS_KM} km of your location.`,
-                        "proximity"
-                    );
+                if (!validCoordinates) continue;
+
+                const distance = getDistanceKm(location, {
+                    latitude: bus.latitude,
+                    longitude: bus.longitude,
+                });
+
+                const isInside = distance <= PROXIMITY_RADIUS_KM;
+                const wasInside = currentInside.has(bus.id);
+
+                if (isInside) {
+                    nextInside.add(bus.id);
+
+                    if (!wasInside && bus.status === "Live") {
+                        addNotification(
+                            bus,
+                            `${bus.routeName} is within ${PROXIMITY_RADIUS_KM} km of your location.`,
+                            "proximity",
+                        );
+                    }
                 }
-            } else {
-                insideRadius.current.delete(bus.id);
             }
-        }
-    };
 
-    checkProximity();
+            // Replacing the set also clears buses that left the radius,
+            // stopped being favorites, or disappeared from the fleet.
+            insideRadiusRef.current = nextInside;
+        };
 
-    const interval = window.setInterval(
-        checkProximity,
-        PROXIMITY_CHECK_INTERVAL_MS
-    );
+        checkProximity();
 
-    return () => window.clearInterval(interval);
-}, [userLocation, fleet, addNotification]);
+        const intervalId = window.setInterval(
+            checkProximity,
+            PROXIMITY_CHECK_INTERVAL_MS,
+        );
 
-    const requestPermission = async () => {
+        return () => window.clearInterval(intervalId);
+    }, [addNotification]);
+
+    const requestPermission = useCallback(async () => {
         if (
             typeof Notification === "undefined" ||
             !window.isSecureContext
         ) {
             return false;
         }
-    
+
         try {
             const result = await Notification.requestPermission();
             setPermission(result);
             return result === "granted";
         } catch (error) {
-            console.warn("Unable to request notification permission.", error);
-    
-            setPermission(
-                typeof Notification !== "undefined"
-                    ? Notification.permission
-                    : "denied"
+            console.warn(
+                "Unable to request notification permission.",
+                error,
             );
-    
+
+            setPermission(Notification.permission);
             return false;
         }
-    };
+    }, []);
 
-    // Temporary test helper: cycles a mock bus through its statuses.
-    const simulateStatusChange = (busId: number) => {
-        const bus = fleet.find((item) => item.id === busId);
-        if (!bus) return;
-
-        const nextStatus: Record<BusStatus, BusStatus> = {
-            Live: "Stale",
-            Stale: "Offline",
-            Offline: "Live",
-        };
-
-        updateBusStatus(busId, nextStatus[bus.status]);
-    };
-
-    const clearNotifications = () => setNotifications([]);
+    const clearNotifications = useCallback(() => {
+        setNotifications([]);
+    }, []);
 
     return {
         notifications,
         permission,
         requestPermission,
         clearNotifications,
-        simulateStatusChange,
         userLocation,
         locationAvailable,
     };

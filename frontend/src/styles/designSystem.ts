@@ -7,7 +7,7 @@ export const UI_STYLES = {
             "shadow-[0_0_10px_2px_rgba(0,255,255,0.6)]"},
 
     button:
-        "rounded-full shadow-md flex items-center justify-center transition-all duration-300",
+        "rounded-2xl shadow-md flex items-center justify-center transition-all duration-300 border",
 
     input:
         "bg-transparent outline-none text-gray-100",

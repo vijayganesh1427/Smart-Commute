@@ -8,6 +8,8 @@ export interface MapViewProps {
     buses: Bus[];
     selBus: Bus | null;
     filBus: Bus[];
+    favoriteBuses?: number[];
+    favoritesOnly?: boolean;
     onRouteDataChange: (data: BusRouteResponse | null) => void;
     onBusSel: (b: Bus) => void;
 }

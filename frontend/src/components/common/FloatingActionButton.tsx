@@ -8,7 +8,7 @@ export default function FloatingActionButton({
     return (
         <button
             onClick={onClick}
-            className={`${UI_STYLES.button} h-12 w-12 bg-gray-900 hover:scale-110 cursor-pointer ${className}`}>
+            className={`${UI_STYLES.button} h-11 w-11 bg-gray-900 hover:scale-110 cursor-pointer ${className}`}>
             {icon}
         </button>
     );

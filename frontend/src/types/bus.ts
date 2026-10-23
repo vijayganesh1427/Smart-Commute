@@ -7,7 +7,7 @@ export interface Bus {
   latitude: number;
   longitude: number;
   status: BusStatus;
-  speed?: number;
+  speed: number;
   direction?: string;
   lastUpdated?: string;
   isAC?: boolean;

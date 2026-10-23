@@ -28,13 +28,17 @@ export default function NotificationCenter({
     };
 
     return (
-        <div className="relative">
+        <div className="
+            absolute right-0 top-12
+            z-20 text-blue-300
+            sm:right-0 sm:-top-5"
+        >
             <button
                 type="button"
                 onClick={() => setIsOpen((open) => !open)}
                 aria-label="Toggle notifications"
                 aria-expanded={isOpen}
-                className="relative flex h-11 w-11 items-center justify-center rounded-xl border border-zinc-700 bg-zinc-900/95 text-zinc-200 shadow-lg backdrop-blur-xl transition hover:border-cyan-500 hover:text-cyan-300"
+                className="relative flex h-11 w-11 items-center justify-center rounded-xl border bg-zinc-900/95 shadow-lg backdrop-blur-xl transition border-cyan-500 text-cyan-300"
             >
                 <Bell size={20} />
 
@@ -48,8 +52,20 @@ export default function NotificationCenter({
             </button>
 
             {isOpen && (
-                <div className="absolute right-0 top-14 z-[1000] w-[min(360px,calc(100vw-24px))] overflow-hidden rounded-2xl border border-zinc-700 bg-zinc-950/95 text-white shadow-2xl backdrop-blur-xl">
-                    <div className="flex items-center justify-between border-b border-zinc-800 px-4 py-3">
+                <div
+                    className="
+                        absolute -right-10 top-12 z-[1000]
+                        w-[min(320px,calc(100vw-32px))]
+                        sm:top-14 sm:w-[360px]
+                        max-h-[min(420px,calc(100dvh-120px))]
+                        overflow-hidden
+                        rounded-xl sm:rounded-2xl
+                        border border-zinc-700
+                        bg-zinc-950/95 text-white
+                        shadow-2xl backdrop-blur-xl
+                    "
+                >    
+                    <div className="flex items-center justify-between border-b border-zinc-800 px-3 py-2.5 sm:px-4 sm:py-3">                        
                         <div className="flex items-center gap-2 font-semibold">
                             <Bell size={18} className="text-cyan-400" />
                             Notifications
@@ -110,9 +126,9 @@ export default function NotificationCenter({
                         </div>
                     )}
 
-                    <div className="max-h-[360px] overflow-y-auto p-3">
+                    <div className="max-h-[min(300px,calc(100dvh-230px))] overflow-y-auto p-2.5 sm:max-h-[360px] sm:p-3">
                         {notifications.length === 0 ? (
-                            <div className="flex flex-col items-center px-5 py-8 text-center">
+                            <div className="flex flex-col items-center px-4 py-5 text-center sm:px-5 sm:py-8">
                                 <div className="mb-3 rounded-full bg-zinc-800 p-3">
                                     <Check
                                         size={22}

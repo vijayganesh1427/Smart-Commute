@@ -28,4 +28,11 @@ export const buses: BackendBus[] = [
         speed: 0,
         status: "Offline",
     },
+    {
+        id: 4,
+        latitude: 12.97671556,
+        longitude: 80.15065111,
+        speed: 0,
+        status: "Offline"
+    }
 ];

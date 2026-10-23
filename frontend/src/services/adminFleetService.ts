@@ -1,0 +1,5 @@
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || "http://localhost:5000").replace(/\/+$/, "");
+export interface BusConfigRecord { busId: number; provider: "vamosys" | "paizogps"; registrationNumber: string; routeName: string; currentArea?: string; isAC: boolean; direction?: string; route: string[]; trackingUrl?: string; }
+async function parse<T>(response: Response): Promise<T> { const data = await response.json().catch(() => ({})); if (!response.ok) throw new Error(typeof data.message === "string" ? data.message : `Request failed (${response.status})`); return data as T; }
+export async function getAdminFleet(key: string): Promise<BusConfigRecord[]> { return parse(await fetch(`${API_BASE_URL}/api/admin/fleet`, { headers: { Accept: "application/json", "x-admin-key": key }, cache: "no-store" })); }
+export async function updateAdminBus(key: string, busId: number, body: Omit<BusConfigRecord, "busId">): Promise<BusConfigRecord> { return parse(await fetch(`${API_BASE_URL}/api/admin/fleet/${busId}`, { method: "PUT", headers: { "Content-Type": "application/json", Accept: "application/json", "x-admin-key": key }, body: JSON.stringify(body) })); }
