@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { Map, Trash2 } from "lucide-react";
 import {
     getAdminRequests,
     reviewAdminRequest,
 } from "../../services/adminRequestService";
 import type { AdminRequest, AdminRequestStatus } from "../../types/adminRequest";
-import { getAdminFleet, updateAdminBus, type BusConfigRecord } from "../../services/adminFleetService";
+import { getAdminFleet, updateAdminBus, deleteAdminBus, type BusConfigRecord } from "../../services/adminFleetService";
 
 const KEY_STORAGE = "smart-commute-admin-key";
 
@@ -16,11 +18,12 @@ const statusClass: Record<AdminRequestStatus, string> = {
 };
 
 export default function AdminFleet() {
+    const navigate = useNavigate();
     const [adminKey, setAdminKey] = useState(() => sessionStorage.getItem(KEY_STORAGE) ?? "");
     const [keyDraft, setKeyDraft] = useState(() => sessionStorage.getItem(KEY_STORAGE) ?? "");
     const [requests, setRequests] = useState<AdminRequest[]>([]);
     const [filter, setFilter] = useState<"pending" | "all">("pending");
-    const [loading, setLoading] = useState(false);
+    const [loading, setLoading] = useState(() => Boolean(sessionStorage.getItem(KEY_STORAGE)));
     const [busyId, setBusyId] = useState<string | null>(null);
     const [error, setError] = useState("");
     const [notice, setNotice] = useState("");
@@ -28,7 +31,28 @@ export default function AdminFleet() {
     const [buses, setBuses] = useState<BusConfigRecord[]>([]);
     const [selectedBusId, setSelectedBusId] = useState("");
     const [busForm, setBusForm] = useState<BusConfigRecord | null>(null);
+    // Keep raw text separate while typing; splitting on every keystroke made commas/spaces jump.
+    const [routeStopsDraft, setRouteStopsDraft] = useState("");
     const [busBusy, setBusBusy] = useState(false);
+
+    async function removeBus() {
+        if (!busForm) return;
+        const confirmed = window.confirm(`Delete Bus ${busForm.busId} (${busForm.registrationNumber}) from buses.json? This cannot be undone.`);
+        if (!confirmed) return;
+        setBusBusy(true); setError(""); setNotice("");
+        try {
+            await deleteAdminBus(adminKey, busForm.busId);
+            const remaining = buses.filter((bus) => bus.busId !== busForm.busId);
+            setBuses(remaining);
+            const next = remaining[0] ?? null;
+            setBusForm(next);
+            setSelectedBusId(next ? String(next.busId) : "");
+            setRouteStopsDraft(next?.route.join(", ") ?? "");
+            setNotice(`Bus ${busForm.busId} deleted from the fleet configuration.`);
+        } catch (err) {
+            setError(err instanceof Error ? err.message : "Could not delete bus.");
+        } finally { setBusBusy(false); }
+    }
 
     const loadBuses = useCallback(async (key: string) => {
         setBusBusy(true);
@@ -40,6 +64,7 @@ export default function AdminFleet() {
                 const chosen = data.find((bus) => String(bus.busId) === selectedBusId) ?? data[0];
                 setSelectedBusId(String(chosen.busId));
                 setBusForm(chosen);
+                setRouteStopsDraft(chosen.route.join(", "));
             }
         } catch (err) {
             setError(err instanceof Error ? err.message : "Could not load bus configuration.");
@@ -51,19 +76,21 @@ export default function AdminFleet() {
         if (!busForm) return;
         setBusBusy(true); setError(""); setNotice("");
         try {
-            const saved = await updateAdminBus(adminKey, busForm.busId, {
+            const originalBusId = Number(selectedBusId);
+            const saved = await updateAdminBus(adminKey, originalBusId, {
+                busId: Number(busForm.busId),
                 provider: busForm.provider,
                 registrationNumber: busForm.registrationNumber,
                 routeName: busForm.routeName,
-                currentArea: busForm.currentArea,
-                direction: busForm.direction,
                 isAC: busForm.isAC,
-                route: busForm.route,
+                route: routeStopsDraft.split(",").map((stop) => stop.trim()).filter(Boolean),
                 trackingUrl: busForm.trackingUrl,
             });
-            setBuses((previous) => previous.map((bus) => bus.busId === saved.busId ? saved : bus));
+            setBuses((previous) => previous.map((bus) => bus.busId === originalBusId ? saved : bus));
+            setSelectedBusId(String(saved.busId));
             setBusForm(saved);
-            setNotice(`Bus ${saved.busId} configuration saved.`);
+            setRouteStopsDraft(saved.route.join(", "));
+            setNotice(`Bus ${originalBusId === saved.busId ? saved.busId : `${originalBusId} → ${saved.busId}`} configuration saved.`);
         } catch (err) {
             setError(err instanceof Error ? err.message : "Could not save bus configuration.");
         } finally { setBusBusy(false); }
@@ -85,8 +112,24 @@ export default function AdminFleet() {
 
     useEffect(() => {
         const saved = sessionStorage.getItem(KEY_STORAGE);
-        if (saved) void load(saved);
-    }, [load]);
+        if (!saved) return;
+
+        let active = true;
+        const loadSavedRequests = async () => {
+            try {
+                const data = await getAdminRequests(saved);
+                if (!active) return;
+                setRequests(data);
+                setAdminKey(saved);
+            } catch (err) {
+                if (active) setError(err instanceof Error ? err.message : "Failed to load admin requests.");
+            } finally {
+                if (active) setLoading(false);
+            }
+        };
+        void loadSavedRequests();
+        return () => { active = false; };
+    }, []);
 
     const visibleRequests = useMemo(() => {
         const sorted = [...requests].sort(
@@ -140,9 +183,12 @@ export default function AdminFleet() {
                         </p>
                     </div>
                     {adminKey && (
-                        <button onClick={signOut} className="rounded-xl border border-zinc-700 px-4 py-2 text-sm hover:bg-zinc-900">
-                            Sign out
-                        </button>
+                        <div className="flex gap-2">
+                            <button onClick={() => navigate("/")} className="inline-flex items-center gap-2 rounded-xl border border-cyan-700 px-4 py-2 text-sm text-cyan-200 hover:bg-cyan-950/50">
+                                <Map size={16} /> Go to map
+                            </button>
+                            <button onClick={signOut} className="rounded-xl border border-zinc-700 px-4 py-2 text-sm hover:bg-zinc-900">Sign out</button>
+                        </div>
                     )}
                 </div>
 
@@ -181,7 +227,7 @@ export default function AdminFleet() {
                                 <button onClick={() => setFilter("all")} className={`rounded-xl px-4 py-2 text-sm font-semibold ${filter === "all" ? "bg-cyan-400 text-zinc-950" : "border border-zinc-700 text-zinc-300"}`}>
                                     All requests
                                 </button>
-                                <button onClick={() => { setSection("buses"); if (!buses.length) void loadBuses(adminKey); }} className={`rounded-xl px-4 py-2 text-sm font-semibold ${section === "buses" ? "bg-cyan-400 text-zinc-950" : "border border-zinc-700 text-zinc-300"}`}>
+                                <button onClick={() => { setSection("buses"); if (!buses.length) void loadBuses(adminKey); }} className="rounded-xl border border-zinc-700 px-4 py-2 text-sm font-semibold text-zinc-300">
                                     All buses
                                 </button>
                             </div>
@@ -232,21 +278,33 @@ export default function AdminFleet() {
                             </div>
                         )}
                         </> : <section className="space-y-5">
+                            <div className="flex flex-wrap gap-2">
+                                <button onClick={() => { setSection("requests"); setFilter("pending"); }} className="rounded-xl border border-zinc-700 px-4 py-2 text-sm text-zinc-300 hover:bg-zinc-900">Pending ({requests.filter((item) => item.status === "pending").length})</button>
+                                <button onClick={() => { setSection("requests"); setFilter("all"); }} className="rounded-xl border border-zinc-700 px-4 py-2 text-sm text-zinc-300 hover:bg-zinc-900">All requests</button>
+                                <button className="rounded-xl bg-cyan-400 px-4 py-2 text-sm font-semibold text-zinc-950">All buses</button>
+                            </div>
                             <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-xl font-bold">All configured buses</h2><p className="text-sm text-zinc-400">Edit the authoritative bus configuration here.</p></div><button onClick={() => void loadBuses(adminKey)} disabled={busBusy} className="rounded-xl border border-zinc-700 px-4 py-2 text-sm hover:bg-zinc-900">{busBusy ? "Loading…" : "Refresh buses"}</button></div>
+                            {buses.length > 0 && <div className="overflow-hidden rounded-2xl border border-zinc-800"><div className="border-b border-zinc-800 bg-zinc-900 px-4 py-3 text-sm font-semibold">Configured bus tracking URLs</div><div className="divide-y divide-zinc-800">{buses.map((bus) => <div key={bus.busId} className="grid gap-1 px-4 py-3 sm:grid-cols-[minmax(180px,0.7fr)_minmax(0,1.3fr)]"><div className="text-sm font-medium">Bus {bus.busId} · {bus.routeName}</div>{bus.trackingUrl ? <a href={bus.trackingUrl} target="_blank" rel="noreferrer" className="break-all text-sm text-cyan-300 underline underline-offset-2">{bus.trackingUrl}</a> : <span className="text-sm text-amber-300">No URL configured</span>}</div>)}</div></div>}
                             {buses.length === 0 ? <p className="rounded-xl border border-zinc-800 p-5 text-zinc-400">No configured buses loaded. Click Refresh buses.</p> : <form onSubmit={saveBus} className="space-y-4 rounded-2xl border border-zinc-800 bg-zinc-900/70 p-5">
-                                <div><label className="mb-1 block text-sm text-zinc-300">Select bus</label><select className="w-full rounded-xl border border-zinc-700 bg-zinc-950 px-3 py-2 text-zinc-100" value={selectedBusId} onChange={event => { const id = event.target.value; setSelectedBusId(id); setBusForm(buses.find(bus => String(bus.busId) === id) ?? null); }}>{buses.map(bus => <option key={bus.busId} value={bus.busId}>Bus {bus.busId} · {bus.registrationNumber} · {bus.routeName}</option>)}</select></div>
+                                <div><label className="mb-1 block text-sm text-zinc-300">Select bus</label><select className="w-full rounded-xl border border-zinc-700 bg-zinc-950 px-3 py-2 text-zinc-100" value={selectedBusId} onChange={event => { const id = event.target.value; setSelectedBusId(id); const chosen = buses.find(bus => String(bus.busId) === id) ?? null; setBusForm(chosen); setRouteStopsDraft(chosen?.route.join(", ") ?? ""); }}>{buses.map(bus => <option key={bus.busId} value={bus.busId}>Bus {bus.busId} · {bus.registrationNumber} · {bus.routeName}</option>)}</select></div>
                                 {busForm && <>
                                     <div className="grid gap-4 sm:grid-cols-2">
-                                    <div><label className="mb-1 block text-sm text-zinc-300">Bus ID</label><input readOnly value={busForm.busId} className="w-full rounded-xl border border-zinc-700 bg-zinc-800 px-3 py-2 text-zinc-400"/></div>
+                                    <div><label className="mb-1 block text-sm text-zinc-300">Bus ID</label><input type="number" min={1} step={1} required value={busForm.busId} onChange={e => setBusForm({...busForm,busId:Number(e.target.value)})} className="w-full rounded-xl border border-zinc-700 bg-zinc-950 px-3 py-2 text-zinc-100"/><p className="mt-1 text-xs text-zinc-500">Changing this renumbers the bus. The new ID must not already exist.</p></div>
                                     <div><label className="mb-1 block text-sm text-zinc-300">Registration number</label><input required value={busForm.registrationNumber} onChange={e => setBusForm({...busForm,registrationNumber:e.target.value})} className="w-full rounded-xl border border-zinc-700 bg-zinc-950 px-3 py-2 text-zinc-100"/></div>
                                     <div><label className="mb-1 block text-sm text-zinc-300">Route name</label><input required value={busForm.routeName} onChange={e => setBusForm({...busForm,routeName:e.target.value})} className="w-full rounded-xl border border-zinc-700 bg-zinc-950 px-3 py-2 text-zinc-100"/></div>
                                     <div><label className="mb-1 block text-sm text-zinc-300">GPS provider</label><select value={busForm.provider} onChange={e => setBusForm({...busForm,provider:e.target.value as BusConfigRecord["provider"]})} className="w-full rounded-xl border border-zinc-700 bg-zinc-950 px-3 py-2 text-zinc-100"><option value="vamosys">Vamosys</option><option value="paizogps">PaizoGPS</option></select></div>
-                                    <div><label className="mb-1 block text-sm text-zinc-300">Current area fallback</label><input value={busForm.currentArea ?? ""} onChange={e => setBusForm({...busForm,currentArea:e.target.value})} className="w-full rounded-xl border border-zinc-700 bg-zinc-950 px-3 py-2 text-zinc-100"/></div>
-                                    <div><label className="mb-1 block text-sm text-zinc-300">Direction</label><input value={busForm.direction ?? ""} onChange={e => setBusForm({...busForm,direction:e.target.value})} className="w-full rounded-xl border border-zinc-700 bg-zinc-950 px-3 py-2 text-zinc-100"/></div></div>
-                                    <div><label className="mb-1 block text-sm text-zinc-300">GPS tracking URL</label><input type="url" required value={busForm.trackingUrl ?? ""} onChange={e => setBusForm({...busForm,trackingUrl:e.target.value})} className="w-full rounded-xl border border-zinc-700 bg-zinc-950 px-3 py-2 text-zinc-100"/></div>
-                                    <div><label className="mb-1 block text-sm text-zinc-300">Route stops (comma-separated)</label><input required value={busForm.route.join(", ")} onChange={e => setBusForm({...busForm,route:e.target.value.split(",").map(s=>s.trim()).filter(Boolean)})} className="w-full rounded-xl border border-zinc-700 bg-zinc-950 px-3 py-2 text-zinc-100"/></div>
+</div>
+                                    <div>
+                                        <label className="mb-1 block text-sm text-zinc-300">GPS tracking URL (.env)</label>
+                                        <input type="url" required value={busForm.trackingUrl ?? ""} onChange={e => setBusForm({...busForm,trackingUrl:e.target.value})} className="w-full rounded-xl border border-zinc-700 bg-zinc-950 px-3 py-2 text-zinc-100"/>
+                                        {busForm.trackingUrl ? <p className="mt-2 break-all text-xs text-zinc-400">Current saved URL: <a href={busForm.trackingUrl} target="_blank" rel="noreferrer" className="text-cyan-300 underline">{busForm.trackingUrl}</a></p> : <p className="mt-2 text-xs text-amber-300">No tracking URL is saved for this bus yet.</p>}
+                                    </div>
+                                    <div><label className="mb-1 block text-sm text-zinc-300">Route stops (comma-separated)</label><input required value={routeStopsDraft} onChange={e => setRouteStopsDraft(e.target.value)} className="w-full rounded-xl border border-zinc-700 bg-zinc-950 px-3 py-2 text-zinc-100"/><p className="mt-1 text-xs text-zinc-500">Edit freely; changes are split into stops only when you save.</p></div>
                                     <label className="flex items-center gap-2 text-sm text-zinc-300"><input type="checkbox" checked={busForm.isAC} onChange={e => setBusForm({...busForm,isAC:e.target.checked})}/> AC bus</label>
+                                    <div className="flex flex-wrap gap-3">
                                     <button disabled={busBusy} className="rounded-xl bg-cyan-400 px-4 py-2 font-bold text-zinc-950 disabled:opacity-50">{busBusy ? "Saving…" : "Save bus changes"}</button>
+                                    <button type="button" onClick={() => void removeBus()} disabled={busBusy || !busForm} className="inline-flex items-center gap-2 rounded-xl border border-rose-500/60 px-4 py-2 font-semibold text-rose-200 hover:bg-rose-950/40 disabled:opacity-50"><Trash2 size={16} /> Delete bus</button>
+                                </div>
                                 </>}
                             </form>}
                         </section>}

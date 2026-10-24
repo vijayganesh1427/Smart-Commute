@@ -5,6 +5,7 @@ import {
     refreshPaizoGpsBus,
     type GpsProvider,
 } from "./gpsIngestionService.js";
+import { getTrackingUrl } from "./trackingUrlStore.js";
 
 const busesPath = path.resolve(
     process.cwd(),
@@ -19,28 +20,17 @@ let isRefreshing = false;
 interface BusConfig {
     busId: number;
     provider: GpsProvider;
-    trackingUrl?: string
 }
 
 async function getConfiguredBuses(): Promise<BusConfig[]> {
     const raw = await readFile(busesPath, "utf8");
     const buses = JSON.parse(raw) as BusConfig[];
 
-    return buses.filter((bus) => {
-        if (bus.provider === "vamosys") {
-            return Boolean(
-                bus.trackingUrl || process.env[`VAMOSYS_BUS_${bus.busId}_TRACKING_URL`]
-            );
-        }
-
-        if (bus.provider === "paizogps") {
-            return Boolean(
-                bus.trackingUrl || process.env[`PAIZOGPS_BUS_${bus.busId}_TRACKING_URL`]
-            );
-        }
-
-        return false;
-    });
+    const configured: BusConfig[] = [];
+    for (const bus of buses) {
+        if (await getTrackingUrl(bus.provider, bus.busId)) configured.push(bus);
+    }
+    return configured;
 }
 
 export async function refreshConfiguredBuses(): Promise<void> {

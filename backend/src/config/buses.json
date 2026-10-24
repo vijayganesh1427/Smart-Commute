@@ -1,82 +1,152 @@
 [
-    {
-        "busId": 29,
-        "provider": "vamosys",
-        "registrationNumber": "TN 12 BL 8737",
-        "routeName": "Velachery Vijayanagar",
-        "isAC": true,
-        "route": ["Velachery Vijayanagar", "Medavakkam", "Mambakkam", "VIT Chennai"]
-    },
-    {
-        "busId": 20,
-        "provider": "paizogps",
-        "registrationNumber": "TN 87 J 3178",
-        "routeName": "Perungudi",
-        "isAC": true,
-        "route": ["Perungudi", "Kamatchi Hospital", "Medavakkam", "Mambakkam", "VIT Chennai"]
-    },
-    {
-        "busId": 27,
-        "provider": "vamosys",
-        "registrationNumber": "TN 02 CB 6737",
-        "routeName": "Sholinganallur",
-        "isAC": true,
-        "route": ["Sholinganallur", "Kelambakkam", "VIT Chennai"]
-    },
-    {
-        "busId": 76,
-        "provider": "paizogps",
-        "registrationNumber": "6757",
-        "routeName": "Rajendra Prasad Road",
-        "isAC": false,
-        "route": ["Pallavaram", "Tambaram", "Medavakkam", "VIT Chennai"]
-    },
-    {
-        "busId": 22,
-        "provider": "vamosys",
-        "registrationNumber": "TN 12 BM 0741",
-        "routeName": "Phoenix Mall",
-        "isAC": true,
-        "route": ["Guindy 100FT Road", "Kaiveli", "Medavakkam", "Mambakkam", "VIT Chennai"]
-    },
-    {
-        "busId": 9,
-        "provider": "paizogps",
-        "registrationNumber": "TN 87 J 3137",
-        "routeName": "Mandaveli",
-        "isAC": true,
-        "route": ["Mandaveli", "Kotturpuram", "Guindy 100FT Road", "Kaiveli", "Medavakkam", "Mambakkam", "VIT Chennai"]
-    },
-    {
-        "busId": 13,
-        "provider": "paizogps",
-        "registrationNumber": "TN 87 J 3129",
-        "routeName": "Kutchery Road",
-        "isAC": true,
-        "route": ["Mylapore", "Adyar", "Taramani", "Tansi Nagar(Velachery)", "Medavakkam", "Mambakkam", "VIT Chennai"]
-    },
-    {
-        "busId": 55,
-        "provider": "vamosys",
-        "registrationNumber": "TN 12 BL 8731",
-        "routeName": "Nolambur",
-        "isAC": true,
-        "route": ["Tambaram", "Vandalur", "VIT Chennai"]
-    },
-    {
-        "busId": 19,
-        "provider": "vamosys",
-        "registrationNumber": "TN 12 BL 9273",
-        "routeName": "Ayodhya Mandapam",
-        "isAC": true,
-        "route": ["St Thomas Mount", "Kaiveli", "Medavakkam", "Mambakkam", "VIT Chennai"]
-    },
-    {
-        "busId": 24,
-        "provider": "vamosys",
-        "registrationNumber": "TN 12 BM 0461",
-        "routeName": "Madipakkam",
-        "isAC": true,
-        "route": ["Madipakkam", "Kovilambakkam", "Medavakkam", "Mambakkam", "VIT Chennai"]
-    }
+  {
+    "busId": 29,
+    "provider": "vamosys",
+    "registrationNumber": "TN 12 BL 8737",
+    "routeName": "Velachery Vijayanagar",
+    "isAC": true,
+    "route": [
+      "Velachery Vijayanagar",
+      "Medavakkam",
+      "Mambakkam",
+      "VIT Chennai"
+    ]
+  },
+  {
+    "busId": 20,
+    "provider": "paizogps",
+    "registrationNumber": "TN 87 J 3178",
+    "routeName": "Perungudi",
+    "isAC": true,
+    "route": [
+      "Perungudi",
+      "Kamatchi Hospital",
+      "Medavakkam",
+      "Mambakkam",
+      "VIT Chennai"
+    ]
+  },
+  {
+    "busId": 27,
+    "provider": "vamosys",
+    "registrationNumber": "TN 02 CB 6737",
+    "routeName": "Sholinganallur",
+    "isAC": true,
+    "route": [
+      "Sholinganallur",
+      "Kelambakkam",
+      "VIT Chennai"
+    ]
+  },
+  {
+    "busId": 76,
+    "provider": "paizogps",
+    "registrationNumber": "6757",
+    "routeName": "Rajendra Prasad Road",
+    "isAC": false,
+    "route": [
+      "Pallavaram",
+      "Tambaram",
+      "Medavakkam",
+      "VIT Chennai"
+    ]
+  },
+  {
+    "busId": 22,
+    "provider": "vamosys",
+    "registrationNumber": "TN 12 BM 0741",
+    "routeName": "Phoenix Mall",
+    "isAC": true,
+    "route": [
+      "Guindy 100FT Road",
+      "Kaiveli",
+      "Medavakkam",
+      "Mambakkam",
+      "VIT Chennai"
+    ]
+  },
+  {
+    "busId": 9,
+    "provider": "paizogps",
+    "registrationNumber": "TN 87 J 3137",
+    "routeName": "Mandaveli",
+    "isAC": true,
+    "route": [
+      "Mandaveli",
+      "Kotturpuram",
+      "Guindy 100FT Road",
+      "Kaiveli",
+      "Medavakkam",
+      "Mambakkam",
+      "VIT Chennai"
+    ]
+  },
+  {
+    "busId": 13,
+    "provider": "paizogps",
+    "registrationNumber": "TN 87 J 3129",
+    "routeName": "Kutchery Road",
+    "isAC": true,
+    "route": [
+      "Mylapore",
+      "Adyar",
+      "Taramani",
+      "Tansi Nagar(Velachery)",
+      "Medavakkam",
+      "Mambakkam",
+      "VIT Chennai"
+    ]
+  },
+  {
+    "busId": 55,
+    "provider": "vamosys",
+    "registrationNumber": "TN 12 BL 8731",
+    "routeName": "Nolambur",
+    "isAC": true,
+    "route": [
+      "Tambaram",
+      "Vandalur",
+      "VIT Chennai"
+    ]
+  },
+  {
+    "busId": 19,
+    "provider": "vamosys",
+    "registrationNumber": "TN 12 BL 9273",
+    "routeName": "Ayodhya Mandapam",
+    "isAC": true,
+    "route": [
+      "St Thomas Mount",
+      "Kaiveli",
+      "Medavakkam",
+      "Mambakkam",
+      "VIT Chennai"
+    ]
+  },
+  {
+    "busId": 24,
+    "provider": "vamosys",
+    "registrationNumber": "TN 12 BM 0461",
+    "routeName": "Madipakkam",
+    "isAC": true,
+    "route": [
+      "Madipakkam",
+      "Kovilambakkam",
+      "Medavakkam",
+      "Mambakkam",
+      "VIT Chennai"
+    ]
+  },
+  {
+    "busId": 15,
+    "provider": "vamosys",
+    "registrationNumber": "TN 02 CB 6967",
+    "routeName": "Triplicane",
+    "isAC": true,
+    "route": [
+      "Triplicane",
+      "Velachery",
+      "VIT Chennai"
+    ]
+  }
 ]

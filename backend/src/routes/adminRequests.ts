@@ -4,6 +4,7 @@ import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { requireAdmin } from "../middleware/requireAdmin";
+import { setTrackingUrl } from "../services/trackingUrlStore";
 
 const router = Router();
 
@@ -31,6 +32,8 @@ interface AdminRequest {
 const currentDirectory = dirname(fileURLToPath(import.meta.url));
 const DATA_FILE = resolve(currentDirectory, "../data/adminRequests.json");
 const TEMP_FILE = `${DATA_FILE}.tmp`;
+const BUSES_FILE = resolve(currentDirectory, "../config/buses.json");
+const BUSES_TEMP_FILE = `${BUSES_FILE}.admin.tmp`;
 
 async function readRequests(): Promise<AdminRequest[]> {
     try {
@@ -123,6 +126,70 @@ router.get("/", requireAdmin, async (_req, res) => {
     }
 });
 
+async function applyRequestToFleet(request: AdminRequest): Promise<void> {
+    let provider: GpsProvider;
+    try {
+        const url = new URL(request.gpsLink);
+        const host = url.hostname.toLowerCase();
+        if (host.includes("vamosys")) provider = "vamosys";
+        else if (host.includes("paizogps") || host.includes("paizo")) provider = "paizogps";
+        else throw new Error("GPS URL must belong to Vamosys or PaizoGPS before approval.");
+    } catch (error) {
+        throw new Error(error instanceof Error ? error.message : "Invalid GPS URL.");
+    }
+    if (!validGpsLink(provider, request.gpsLink)) {
+        throw new Error("GPS URL is not valid for the detected provider.");
+    }
+
+    let buses: any[];
+    try {
+        const raw = await readFile(BUSES_FILE, "utf8");
+        const parsed: unknown = JSON.parse(raw);
+        if (!Array.isArray(parsed)) throw new Error("buses.json must contain an array.");
+        buses = parsed as any[];
+    } catch (error) {
+        throw new Error(error instanceof Error ? error.message : "Could not read buses.json.");
+    }
+
+    const index = buses.findIndex((bus) => Number(bus.busId) === request.busId);
+    if (request.kind === "add") {
+        if (index >= 0) throw new Error(`Bus ${request.busId} already exists. Submit an edit request instead.`);
+        // The student form intentionally collects only minimal details. Admin can complete
+        // registration, AC status, and route stops in All buses after approval.
+        buses.push({
+            busId: request.busId,
+            provider,
+            registrationNumber: request.registrationNumber?.trim() || `PENDING-${request.busId}`,
+            routeName: request.routeName.trim(),
+            isAC: request.isAC ?? false,
+            route: request.route?.length ? request.route : [request.routeName.trim()],
+        });
+    } else {
+        if (index < 0) throw new Error(`Bus ${request.busId} does not exist. Submit an add request instead.`);
+        buses[index] = {
+            ...buses[index],
+            provider,
+            registrationNumber: request.registrationNumber?.trim() || buses[index].registrationNumber,
+            routeName: request.routeName.trim(),
+            isAC: typeof request.isAC === "boolean" ? request.isAC : buses[index].isAC,
+            route: request.route?.length ? request.route : buses[index].route,
+        };
+    }
+
+    // Persist the provider URL in .env and update process.env immediately so the running scheduler sees it.
+    await setTrackingUrl(provider, request.busId, request.gpsLink);
+
+    // Keep buses.json limited to fleet metadata; never store GPS URLs or transient area/direction fields here.
+    buses.forEach((bus) => {
+        delete bus.trackingUrl;
+        delete bus.currentArea;
+        delete bus.direction;
+    });
+    await mkdir(dirname(BUSES_FILE), { recursive: true });
+    await writeFile(BUSES_TEMP_FILE, JSON.stringify(buses, null, 2) + "\n", "utf8");
+    await rename(BUSES_TEMP_FILE, BUSES_FILE);
+}
+
 router.patch("/:id/review", requireAdmin, async (req, res) => {
     const { decision, reviewNote } = req.body ?? {};
     if (!["approved", "rejected", "archived"].includes(decision)) {
@@ -137,6 +204,15 @@ router.patch("/:id/review", requireAdmin, async (req, res) => {
         const current = requests[index];
         if (current.status !== "pending" && decision !== "archived") {
             return res.status(409).json({ message: "Only pending requests can be approved or rejected." });
+        }
+
+        if (decision === "approved") {
+            try {
+                await applyRequestToFleet(current);
+            } catch (error) {
+                const message = error instanceof Error ? error.message : "Could not apply request to fleet.";
+                return res.status(400).json({ message });
+            }
         }
 
         const updated: AdminRequest = {

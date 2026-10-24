@@ -29,9 +29,7 @@ interface BusConfig {
     provider: GpsProvider;
     registrationNumber: string;
     routeName: string;
-    currentArea?: string;
     isAC: boolean;
-    direction?: string;
     route: string[];
 }
 
@@ -214,14 +212,14 @@ function normalize(
             providerRegistration ||
             `Bus ${config.busId}`,
         routeName: config.routeName,
-        currentArea: config.currentArea ?? "Unknown",
+        currentArea: "Unknown",
         latitude,
         longitude,
         status,
         speed: speed !== null && speed >= 0 && status !== "Offline"
             ? speed
             : 0,
-        direction: config.direction ?? "Unknown",
+        direction: "Unknown",
         heading,
         lastUpdated: ageLabel(safeTimestamp, now),
         lastSeen:
@@ -254,7 +252,7 @@ export async function getFleet(): Promise<NormalizedBus[]> {
                 bus.id,
                 bus.latitude,
                 bus.longitude,
-                config.currentArea ?? "Unknown"
+                "Unknown"
             );
 
             buses.push(bus);

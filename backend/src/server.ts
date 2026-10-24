@@ -3,9 +3,7 @@ import cors from "cors";
 import routeRouter from "./routes/route";
 import crowdReportsRouter from "./routes/crowdReports";
 import "dotenv/config";
-import gpsRouter from "./routes/gps.js";
-import { startGpsRefreshScheduler } from "./services/gpsRefreshScheduler.js";
-import gpsPaizoRouter from "./routes/gpsPaizo.js";
+import { startGpsRefreshScheduler } from "./services/gpsRefreshScheduler";
 import adminRequestsRouter from "./routes/adminRequests";
 import adminFleetRouter from "./routes/adminFleet";
 
@@ -13,8 +11,6 @@ const app = express();
 
 app.use(cors());
 app.use(express.json());
-app.use("/api/gps", gpsRouter);
-app.use("/api/gps/paizo", gpsPaizoRouter);
 app.use("/api/admin/requests", adminRequestsRouter);
 app.use("/api/admin/fleet", adminFleetRouter);
 

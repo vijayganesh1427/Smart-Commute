@@ -143,7 +143,7 @@ export default function MainLayout({
             <SearchBar onSearch={onSearch} />
             <TopBar />
 
-            <div className="fixed right-16 top-25 z-[1000]">
+            <div className="absolute right-16 top-25 z-[1000]">
                 <NotificationCenter
                     notifications={notifications}
                     permission={permission}

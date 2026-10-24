@@ -133,8 +133,6 @@ export default function Analytics({
         (bus) => bus.status === "Live"
     );
 
-    const inactiveBuses = staleBuses.length + offlineBuses.length;
-
     const averageLiveSpeed = liveBuses.length
         ? Math.round(
               liveBuses.reduce((total, bus) => total + bus.speed, 0) /

@@ -3,13 +3,13 @@ import path from "node:path";
 import { fetchVamosysLocation } from "../providers/vamosysAdapter.js";
 import { fetchPaizoGpsLocation } from "../providers/paizogpsAdapter.js";
 import { saveGpsSnapshot } from "./gpsStore.js";
+import { getTrackingUrl } from "./trackingUrlStore.js";
 
 export type GpsProvider = "vamosys" | "paizogps";
 
 interface BusConfig {
     busId: number;
     provider: GpsProvider;
-    trackingUrl?: string
 }
 
 const busesPath = path.resolve(
@@ -57,8 +57,7 @@ export async function refreshVamosysBus(busId: number) {
         throw new Error(`Bus ${busId} is not configured for Vamosys`);
     }
 
-    const trackingUrl = config.trackingUrl || 
-        process.env[`VAMOSYS_BUS_${busId}_TRACKING_URL`];
+    const trackingUrl = await getTrackingUrl("vamosys", busId);
 
     if (!trackingUrl) {
         throw new Error(
@@ -100,8 +99,7 @@ export async function refreshPaizoGpsBus(busId: number) {
         throw new Error(`Bus ${busId} is not configured for PaizoGPS`);
     }
 
-    const trackingUrl = config.trackingUrl || 
-        process.env[`PAIZOGPS_BUS_${busId}_TRACKING_URL`];
+    const trackingUrl = await getTrackingUrl("paizogps", busId);
 
     if (!trackingUrl) {
         throw new Error(
